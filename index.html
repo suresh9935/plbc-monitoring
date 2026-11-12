@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PLBC Water Monitoring System (0–208 km) | जलसंपदा विभाग</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans Devanagari -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans Devanagari"', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            wrdNavy: '#0B3558',
+            wrdBlue: '#0F4C81',
+            wrdAccent: '#0284C7',
+            wrdBg: '#F1F5F9'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Noto Sans Devanagari', 'Inter', sans-serif;
+      background-color: #F1F5F9;
+      color: #0F172A;
+    }
+    /* Custom scrollbar for clean tables */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #E2E8F0; }
+    ::-webkit-scrollbar-thumb { background: #94A3B8; border-radius: 9999px; }
+    @media print {
+      body * { visibility: hidden; }
+      #receiptPrintArea, #receiptPrintArea * { visibility: visible; }
+      #receiptPrintArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none !important;
+        border: 2px solid #0B3558 !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+  <!-- ==================== GLOBAL MESSAGE / TOAST BANNER ==================== -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
+  <!-- ==================== 1. UNAUTHENTICATED: LOGIN & SELF-SIGNUP VIEW ==================== -->
+  <div id="authSection" class="flex-grow flex items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-xl space-y-5">
+
+      <!-- Header Banner -->
+      <div class="bg-gradient-to-r from-wrdNavy to-wrdBlue text-white rounded-2xl p-6 shadow-lg border border-blue-900/30">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-xs uppercase tracking-wider text-sky-200 font-semibold">महाराष्ट्र शासन • जलसंपदा विभाग</p>
+            <h1 class="text-2xl sm:text-3xl font-bold mt-1">PLBC Water Monitoring</h1>
+            <p class="text-xs sm:text-sm text-slate-200 mt-1">पैठण डावा कालवा (0–208 km) • SUPERADMIN • SDO • SO • Beat Head</p>
+          </div>
+          <div class="bg-white/15 p-3 rounded-xl shrink-0">
+            <svg class="w-8 h-8 text-sky-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode Switcher Tabs (Login vs Self-Signup) -->
+      <div class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+        <div class="grid grid-cols-2 border-b border-slate-200 bg-slate-50">
+          <button id="tabShowLogin" onclick="switchAuthTab('login')" class="py-3.5 px-4 text-sm sm:text-base font-bold text-wrdNavy border-b-2 border-wrdNavy bg-white transition">
+            अधिकारी / कर्मचारी Login
+          </button>
+          <button id="tabShowSignup" onclick="switchAuthTab('signup')" class="py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-600 hover:text-wrdNavy transition">
+            + नवीन User तयार करा
+          </button>
+        </div>
+
+        <!-- LOGIN PANEL -->
+        <div id="loginPanel" class="p-6 space-y-4">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800">प्रणालीमध्ये प्रवेश करा</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Admin Email किंवा तुमचा नियुक्त User ID व Password भरा.</p>
+          </div>
+
+          <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Admin Email किंवा User ID</label>
+              <input id="loginIdentifier" type="text" required placeholder="उदा. plbc_div1_sd06_so_001"
+                class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent focus:border-wrdAccent" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Password</label>
+              <div class="relative">
+                <input id="loginPassword" type="password" required placeholder="••••••••"
+                  class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent focus:border-wrdAccent" />
+                <button type="button" onclick="togglePassword('loginPassword')" class="absolute right-3 top-3 text-xs font-medium text-slate-500 hover:text-slate-800">
+                  पहा
+                </button>
+              </div>
+            </div>
+
+            <button id="btnLoginSubmit" type="submit"
+              class="w-full bg-wrdAccent hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-xl shadow transition flex items-center justify-center gap-2">
+              <span>Login करा</span>
+            </button>
+          </form>
+
+          <div class="pt-2">
+            <button type="button" onclick="switchAuthTab('signup')"
+              class="w-full border-2 border-wrdBlue text-wrdBlue hover:bg-blue-50 font-bold py-2.5 px-4 rounded-xl text-sm transition">
+              + नवीन User तयार करा (New User Registration)
+            </button>
+          </div>
+
+          <div id="loginStatusBox" class="bg-slate-100 text-slate-700 text-xs rounded-xl p-3 border border-slate-200">
+            नवीन खाते तयार करण्यासाठी वरील <strong>"+ नवीन User तयार करा"</strong> बटणावर क्लिक करा.
+          </div>
+        </div>
+
+        <!-- SELF-SIGNUP PANEL -->
+        <div id="signupPanel" class="p-6 space-y-4 hidden">
+          <div>
+            <h2 class="text-lg font-bold text-wrdNavy">नवीन User तयार करा (Self-Signup)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">कार्यालय निवडल्यावर User ID निश्चित फॉरमॅटमध्ये आपोआप तयार होईल. Password किमान 8 अक्षरी असावा.</p>
+          </div>
+
+          <div id="signupFormContainer"></div>
+        </div>
+      </div>
+
+      <!-- Optional Supabase Config Box -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+        <button type="button" onclick="document.getElementById('configFields').classList.toggle('hidden')"
+          class="text-xs font-bold text-wrdNavy flex items-center gap-1.5">
+          <span>⚙ Supabase Configuration पहा / बदला (ऐच्छिक)</span>
+        </button>
+        <div id="configFields" class="hidden mt-3 space-y-2.5">
+          <input id="cfgUrl" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" placeholder="Supabase URL" />
+          <input id="cfgKey" type="password" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs" placeholder="Supabase Anon/Publishable Key" />
+          <div class="flex gap-2">
+            <button type="button" onclick="saveSupabaseConfig()" class="bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg">Save Config</button>
+            <button type="button" onclick="resetSupabaseConfig()" class="bg-slate-200 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg">Reset Default</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== 2. AUTHENTICATED MAIN APPLICATION SHELL ==================== -->
+  <div id="appSection" class="hidden flex-grow flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-wrdNavy text-white shadow-md sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="bg-sky-500/20 border border-sky-400/30 p-2 rounded-xl">
+            <svg class="w-6 h-6 text-sky-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold leading-tight">PLBC Water Monitoring (0–208 km)</h1>
+            <div class="flex flex-wrap items-center gap-2 mt-0.5">
+              <span id="headerUserName" class="text-xs text-sky-200 font-medium">Loading...</span>
+              <span id="headerUserRole" class="text-[11px] uppercase tracking-wider bg-sky-600/60 border border-sky-400/40 px-2 py-0.5 rounded-full font-bold">ROLE</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="refreshAllAppData()" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+            ↻ Refresh
+          </button>
+          <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition">
+            Logout
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="bg-wrdBlue/90 border-t border-white/10 overflow-x-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 flex space-x-1 sm:space-x-2 py-1.5 whitespace-nowrap" id="navTabsContainer">
+          <button data-tab="dashboard" onclick="switchAppTab('dashboard')" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold bg-white text-wrdNavy shadow-sm">
+            📊 PLBC Dashboard
+          </button>
+          <button data-tab="operation" onclick="switchAppTab('operation')" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+            💧 विसर्ग / कालवा संचालन नोंद
+          </button>
+          <button data-tab="mapping" id="navTabMapping" onclick="switchAppTab('mapping')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+            🗺️ Structure → Section Officer Mapping
+          </button>
+          <button data-tab="beats" id="navTabBeats" onclick="switchAppTab('beats')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+            📍 Beat Master
+          </button>
+          <button data-tab="users" id="navTabUsers" onclick="switchAppTab('users')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+            👤 + नवीन User तयार करा
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex-grow space-y-6">
+
+      <!-- ==================== TAB 1: DASHBOARD ==================== -->
+      <section id="view-dashboard" class="app-view space-y-6">
+        <!-- KPI Summary Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">एकूण Structures</p>
+            <p id="kpiTotalStructures" class="text-2xl sm:text-3xl font-bold text-wrdNavy mt-1">0</p>
+            <p class="text-[11px] text-slate-400 mt-1">वितरिका व लघुकालवे</p>
+          </div>
+          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">सुरू असलेले (ON)</p>
+            <p id="kpiActiveStructures" class="text-2xl sm:text-3xl font-bold text-emerald-600 mt-1">0</p>
+            <p class="text-[11px] text-emerald-700/70 mt-1">सध्या पाणी सुरू</p>
+          </div>
+          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">एकूण चालू विसर्ग</p>
+            <p id="kpiTotalDischarge" class="text-2xl sm:text-3xl font-bold text-wrdAccent mt-1">0.0</p>
+            <p class="text-[11px] text-slate-400 mt-1">Cusecs (क्युसेक्स)</p>
+          </div>
+          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+            <p class="text-xs font-semibold text-slate-500">Tail Reached (टेल)</p>
+            <p id="kpiTailReached" class="text-2xl sm:text-3xl font-bold text-indigo-600 mt-1">0</p>
+            <p class="text-[11px] text-slate-400 mt-1">शेवटपर्यंत पाणी पोहोचले</p>
+          </div>
+        </div>
+
+        <!-- Structures Live Status Table -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base sm:text-lg font-bold text-slate-800">Structures सद्यस्थिती (Live Status)</h2>
+              <p class="text-xs text-slate-500">सध्याचा विसर्ग, स्थिती आणि टेल रिच माहिती</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <input id="dashSearchInput" type="text" oninput="renderDashboardTables()" placeholder="Structure नाव / ID शोधा..."
+                class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+              <select id="dashStatusFilter" onchange="renderDashboardTables()"
+                class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="all">सर्व स्थिती (All)</option>
+                <option value="on">फक्त सुरू (ON)</option>
+                <option value="off">फक्त बंद (OFF)</option>
+                <option value="tail">Tail Reached</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-600">
+                  <th class="py-3 px-4 font-bold">Structure</th>
+                  <th class="py-3 px-4 font-bold">प्रकार / साखळी</th>
+                  <th class="py-3 px-4 font-bold">मंजूर / चालू विसर्ग</th>
+                  <th class="py-3 px-4 font-bold">स्थिती</th>
+                  <th class="py-3 px-4 font-bold">Tail Reach</th>
+                </tr>
+              </thead>
+              <tbody id="structuresTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+                <tr><td colspan="5" class="py-6 text-center text-slate-400">डेटा लोड होत आहे...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Canal Operation Events -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200">
+            <h2 class="text-base sm:text-lg font-bold text-slate-800">अलीकडील कालवा संचालन नोंदी (Recent Events)</h2>
+            <p class="text-xs text-slate-500">शेवटच्या ५० विसर्ग व संचालन नोंदी</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-600">
+                  <th class="py-3 px-4 font-bold">वेळ (Event Time)</th>
+                  <th class="py-3 px-4 font-bold">Structure</th>
+                  <th class="py-3 px-4 font-bold">प्रकार (Event)</th>
+                  <th class="py-3 px-4 font-bold">विसर्ग (Cusecs)</th>
+                  <th class="py-3 px-4 font-bold">शेरा (Remarks)</th>
+                </tr>
+              </thead>
+              <tbody id="eventsTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+                <tr><td colspan="5" class="py-6 text-center text-slate-400">नोंदी लोड होत आहेत...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: CANAL OPERATION / DISCHARGE ENTRY ==================== -->
+      <section id="view-operation" class="app-view hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Entry Form -->
+          <div class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4">
+            <div>
+              <h2 class="text-lg font-bold text-wrdNavy">विसर्ग / कालवा संचालन नोंद (Discharge Entry)</h2>
+              <p class="text-xs text-slate-500 mt-0.5">वितरिका किंवा लघुकालव्याचा चालू विसर्ग व टेल रिच स्थिती नोंदवा.</p>
+            </div>
+
+            <form id="operationForm" onsubmit="submitCanalOperation(event)" class="space-y-4">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Structure निवडा *</label>
+                <select id="opStructureSelect" required onchange="onOpStructureChange()"
+                  class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                  <option value="">— Structure निवडा —</option>
+                </select>
+                <p id="opStructureInfo" class="text-xs text-slate-500 mt-1"></p>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-1">संचालन प्रकार (Event Type) *</label>
+                  <select id="opEventType" required onchange="onOpEventTypeChange()"
+                    class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                    <option value="OPEN">सुरू केले (OPEN / START)</option>
+                    <option value="DISCHARGE_CHANGE">विसर्ग बदल (DISCHARGE CHANGE)</option>
+                    <option value="CLOSE">बंद केले (CLOSE / STOP)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-1">चालू विसर्ग (Cusecs) *</label>
+                  <input id="opDischarge" type="number" step="0.01" min="0" required placeholder="उदा. 12.50"
+                    class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-1">Tail Reach (शेवटपर्यंत पाणी पोहोचले?)</label>
+                  <select id="opTailReached"
+                    class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                    <option value="false">नाही (No)</option>
+                    <option value="true">होय (Yes - Tail Reached)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-semibold text-slate-700 mb-1">पाळी कालावधी (Rotation Days - ऐच्छिक)</label>
+                  <input id="opRotationDays" type="number" min="0" placeholder="उदा. 7"
+                    class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">शेरा / टीप (Remarks - ऐच्छिक)</label>
+                <input id="opRemarks" type="text" placeholder="उदा. पाळी क्र. २ नुसार विसर्ग सोडला"
+                  class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+              </div>
+
+              <button id="btnSaveOperation" type="submit"
+                class="w-full bg-wrdAccent hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-xl shadow transition">
+                Operation नोंद Save करा व पावती तयार करा
+              </button>
+            </form>
+          </div>
+
+          <!-- Digital Receipt Preview Card -->
+          <div class="lg:col-span-5">
+            <div id="receiptPrintArea" class="bg-white rounded-2xl shadow-sm border-2 border-wrdNavy/20 p-5 sm:p-6 space-y-4">
+              <div class="border-b-2 border-wrdNavy pb-3 text-center">
+                <p class="text-[11px] font-bold text-slate-500 uppercase">महाराष्ट्र शासन • जलसंपदा विभाग</p>
+                <h3 class="text-base font-bold text-wrdNavy mt-0.5">पैठण डावा कालवा (PLBC 0–208 km)</h3>
+                <span class="inline-block mt-1 bg-sky-100 text-wrdNavy text-[11px] font-bold px-3 py-0.5 rounded-full">
+                  डिजिटल विसर्ग संचालन पावती
+                </span>
+              </div>
+
+              <div id="receiptBody" class="space-y-2.5 text-xs sm:text-sm text-slate-700">
+                <p class="text-center text-slate-400 py-8">डावीकडील फॉर्म भरून <strong>Save</strong> केल्यावर येथे अधिकृत डिजिटल पावती तयार होईल.</p>
+              </div>
+
+              <div id="receiptActions" class="hidden pt-3 border-t border-slate-200 flex gap-2">
+                <button type="button" onclick="window.print()" class="flex-1 bg-wrdNavy hover:bg-wrdBlue text-white text-xs font-bold py-2.5 px-3 rounded-xl transition">
+                  🖨️ पावती Print / PDF Save करा
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 3: STRUCTURE -> SECTION OFFICER MAPPING ==================== -->
+      <section id="view-mapping" class="app-view hidden">
+        <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h2 class="text-lg font-bold text-wrdNavy">Structure → Section Officer Mapping</h2>
+              <p class="text-xs text-slate-500 mt-0.5">ही स्क्रीन <code class="bg-slate-100 px-1 rounded">plbc_structure_mapping</code> टेबल अपडेट करते.</p>
+            </div>
+            <button type="button" onclick="refreshAllAppData()" class="border border-slate-300 hover:bg-slate-50 text-xs font-bold px-3 py-1.5 rounded-lg">
+              REFRESH
+            </button>
+          </div>
+
+          <form onsubmit="saveStructureMapping(event)" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Structure निवडा *</label>
+              <select id="mapStructureSelect" required onchange="onMapStructureSelect()"
+                class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="">— Structure निवडा —</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Subdivision Mapping *</label>
+              <select id="mapSubdivSelect" required onchange="onMapSubdivChange()"
+                class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="">— Subdivision निवडा —</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Branch / Section Officer Mapping (ऐच्छिक)</label>
+              <select id="mapBranchSelect" onchange="onMapBranchChange()"
+                class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="">— Branch / Section Officer निवडा —</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Beat Mapping (ऐच्छिक)</label>
+              <select id="mapBeatSelect"
+                class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="">— बीट (ऐच्छिक) —</option>
+              </select>
+            </div>
+
+            <button id="btnSaveMapping" type="submit"
+              class="w-full bg-wrdBlue hover:bg-wrdNavy text-white font-bold py-3 px-4 rounded-xl shadow transition">
+              Save Structure Mapping
+            </button>
+          </form>
+
+          <div id="mappingStatusBox" class="bg-slate-100 text-slate-700 text-xs rounded-xl p-3 border border-slate-200">
+            माहिती लोड होत आहे...
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 4: BEAT MASTER ==================== -->
+      <section id="view-beats" class="app-view hidden">
+        <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4">
+          <div>
+            <h2 class="text-lg font-bold text-wrdNavy">Beat Master (नवीन बीट तयार करा)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">संबंधित Branch (शाखा) अंतर्गत नवीन Beat जोडा.</p>
+          </div>
+
+          <form onsubmit="createNewBeat(event)" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1">Branch निवडा *</label>
+              <select id="beatBranchSelect" required
+                class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="">— Branch निवडा —</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Beat चे नाव *</label>
+                <input id="beatNameInput" type="text" required placeholder="उदा. Beat No. 1 (0-10 km)"
+                  class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">Beat Code (ऐच्छिक)</label>
+                <input id="beatCodeInput" type="text" placeholder="उदा. BT01"
+                  class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+              </div>
+            </div>
+
+            <button id="btnSaveBeat" type="submit"
+              class="w-full bg-wrdAccent hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-xl shadow transition">
+              नवीन Beat Save करा
+            </button>
+          </form>
+
+          <div class="pt-2">
+            <h3 class="text-xs font-bold uppercase text-slate-500 mb-2">उपलब्ध Beats यादी (<span id="beatTotalCount">0</span>)</h3>
+            <div id="beatsListPreview" class="max-h-60 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl text-xs"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 5: ADMIN / SDO CREATE USER ==================== -->
+      <section id="view-users" class="app-view hidden">
+        <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4">
+          <div>
+            <h2 class="text-lg font-bold text-wrdNavy">नवीन अधिकारी / कर्मचारी खाते तयार करा</h2>
+            <p class="text-xs text-slate-500 mt-0.5">कार्यालय निवडल्यावर User ID आपोआप तयार होईल आणि कार्यालय अधिकार मॅप होतील.</p>
+          </div>
+          <div id="adminUserFormContainer"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==================== GLOBAL FOOTER ==================== -->
+  <footer class="py-4 px-4 text-center border-t border-slate-200/80 bg-white/60 mt-auto">
+    <p class="text-[11px] text-slate-500 leading-relaxed">
+      App Developed by <span class="font-semibold text-slate-700">Suresh Bhange, Sub Divisional Officer</span> &bull; &copy; 2026 All Rights Reserved
+    </p>
+  </footer>
+
+  <!-- ==================== REUSABLE USER CREATION FORM TEMPLATE ==================== -->
+  <template id="userCreateFormTemplate">
+    <form class="user-create-form space-y-3.5" onsubmit="handleCreateUserSubmit(event, this)">
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">पूर्ण नाव (कर्मचाऱ्याचे पूर्ण नाव) *</label>
+        <input name="fullName" type="text" required placeholder="उदा. श्री. राजेंद्र पाटील"
+          class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+      </div>
+
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Role निवडा *</label>
+        <select name="role" onchange="onUserFormRoleOrOrgChange(this.form)"
+          class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+          <option value="ce">CE</option>
+          <option value="se">SE</option>
+          <option value="ee1">EE1</option>
+          <option value="ee2">EE2</option>
+          <option value="sdo">SDO</option>
+          <option value="section_officer" selected>Section Officer</option>
+          <option value="division_officer">Division Officer</option>
+          <option value="subdivision_officer">Subdivision Officer</option>
+          <option value="branch_officer">Branch Officer</option>
+          <option value="beat_head">Beat Head</option>
+          <option value="staff">Staff</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Division</label>
+        <select name="divisionId" onchange="onUserFormDivChange(this.form)"
+          class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+          <option value="">— Division निवडा —</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Subdivision</label>
+        <select name="subdivisionId" onchange="onUserFormSubdivChange(this.form)"
+          class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+          <option value="">— Subdivision निवडा —</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Branch (Section Office)</label>
+        <select name="branchId" onchange="onUserFormBranchChange(this.form)"
+          class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+          <option value="">— Branch निवडा —</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Beat</label>
+        <select name="beatId" onchange="onUserFormRoleOrOrgChange(this.form)"
+          class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white whitespace-normal focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+          <option value="">— Beat निवडा —</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">User ID (Auto Generate)</label>
+        <input name="autoUsername" type="text" readonly
+          class="w-full rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2.5 text-sm font-bold text-wrdNavy" />
+      </div>
+
+      <div>
+        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Initial Password (किमान 8 characters) *</label>
+        <input name="password" type="password" required minlength="8" placeholder="किमान 8 अक्षरे व अंक"
+          class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+      </div>
+
+      <button type="submit" name="submitBtn"
+        class="w-full bg-wrdAccent hover:bg-sky-700 text-white font-bold py-3 px-4 rounded-xl shadow transition">
+        Create User
+      </button>
+
+      <div class="create-user-status bg-slate-100 text-slate-700 text-xs rounded-xl p-3 border border-slate-200">
+        कार्यालय माहिती लोड होत आहे...
+      </div>
+    </form>
+  </template>
+
+  <!-- ==================== JAVASCRIPT APPLICATION LOGIC ==================== -->
+  <script>
+    // 1. SUPABASE CONFIGURATION
+    const DEFAULT_SB_URL = "https://avcnvqqrhzdymehxxouh.supabase.co";
+    const DEFAULT_SB_KEY = "sb_publishable_mDDvfpPt99i_rRonuwy_kw_SKb67eB1";
+    const STORAGE_KEY = "plbc_web_session_v1";
+
+    function getSbUrl() {
+      return (localStorage.getItem("plbc_sb_url") || DEFAULT_SB_URL).trim().replace(/\/$/, "");
+    }
+    function getSbKey() {
+      return (localStorage.getItem("plbc_sb_key") || DEFAULT_SB_KEY).trim();
+    }
+    function getSession() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      } catch {
+        return null;
+      }
+    }
+    function saveSession(sessionObj) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionObj));
+    }
+    function clearSession() {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+
+    // Global State
+    let orgData = {
+      divisions: [],
+      subdivisions: [],
+      branches: [],
+      beats: [],
+      profiles: [],
+      structures: [],
+      structureMappings: [],
+      operationEvents: []
+    };
+
+    // Toast Notification Helper (Never uses alert())
+    function showToast(message, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const colors = {
+        success: "bg-emerald-600 text-white",
+        error: "bg-rose-600 text-white",
+        info: "bg-wrdNavy text-white"
+      };
+      const el = document.createElement("div");
+      el.className = `${colors[type] || colors.info} rounded-xl shadow-lg px-4 py-3 text-xs sm:text-sm font-medium mb-2 transition-all duration-300`;
+      el.textContent = message;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = "0";
+        setTimeout(() => el.remove(), 300);
+      }, 4000);
+    }
+
+    function togglePassword(inputId) {
+      const el = document.getElementById(inputId);
+      el.type = el.type === "password" ? "text" : "password";
+    }
+
+    function saveSupabaseConfig() {
+      const u = document.getElementById("cfgUrl").value.trim();
+      const k = document.getElementById("cfgKey").value.trim();
+      if (u) localStorage.setItem("plbc_sb_url", u.replace(/\/$/, ""));
+      if (k) localStorage.setItem("plbc_sb_key", k);
+      showToast("Supabase Configuration सेव्ह झाले.", "success");
+      loadPublicOrgData();
+    }
+
+    function resetSupabaseConfig() {
+      localStorage.removeItem("plbc_sb_url");
+      localStorage.removeItem("plbc_sb_key");
+      document.getElementById("cfgUrl").value = DEFAULT_SB_URL;
+      document.getElementById("cfgKey").value = DEFAULT_SB_KEY;
+      showToast("Default Configuration पुनर्संचयित केले.", "info");
+      loadPublicOrgData();
+    }
+
+    // Generic Supabase REST Fetch Helper
+    async function sbFetch(path, options = {}) {
+      const session = getSession();
+      const token = session?.access_token || getSbKey();
+      const headers = {
+        "apikey": getSbKey(),
+        "Authorization": `Bearer ${token}`,
+        ...(options.headers || {})
+      };
+      const resp = await fetch(`${getSbUrl()}${path}`, {
+        ...options,
+        headers
+      });
+      const text = await resp.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+      if (!resp.ok) {
+        const msg = data?.error_description || data?.message || data?.msg || data?.error || `HTTP ${resp.status}`;
+        throw new Error(msg);
+      }
+      return data;
+    }
+
+    // 2. AUTHENTICATION (LOGIN / LOGOUT / SELF-SIGNUP)
+    function switchAuthTab(tab) {
+      const loginPanel = document.getElementById("loginPanel");
+      const signupPanel = document.getElementById("signupPanel");
+      const btnLogin = document.getElementById("tabShowLogin");
+      const btnSignup = document.getElementById("tabShowSignup");
+
+      if (tab === "login") {
+        loginPanel.classList.remove("hidden");
+        signupPanel.classList.add("hidden");
+        btnLogin.className = "py-3.5 px-4 text-sm sm:text-base font-bold text-wrdNavy border-b-2 border-wrdNavy bg-white transition";
+        btnSignup.className = "py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-600 hover:text-wrdNavy transition";
+      } else {
+        loginPanel.classList.add("hidden");
+        signupPanel.classList.remove("hidden");
+        btnSignup.className = "py-3.5 px-4 text-sm sm:text-base font-bold text-wrdNavy border-b-2 border-wrdNavy bg-white transition";
+        btnLogin.className = "py-3.5 px-4 text-sm sm:text-base font-semibold text-slate-600 hover:text-wrdNavy transition";
+        if (orgData.divisions.length === 0) loadPublicOrgData();
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const identifier = document.getElementById("loginIdentifier").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      const btn = document.getElementById("btnLoginSubmit");
+      const statusBox = document.getElementById("loginStatusBox");
+
+      if (!identifier || !password) return;
+
+      const email = identifier.includes("@")
+        ? identifier.toLowerCase()
+        : `${identifier.toLowerCase()}@plbc-login.invalid`;
+
+      btn.disabled = true;
+      btn.textContent = "Login तपासत आहे...";
+      statusBox.textContent = "कृपया प्रतीक्षा करा...";
+
+      try {
+        const authRes = await fetch(`${getSbUrl()}/auth/v1/token?grant_type=password`, {
+          method: "POST",
+          headers: {
+            "apikey": getSbKey(),
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ email, password })
+        });
+        const authData = await authRes.json();
+        if (!authRes.ok) {
+          throw new Error(authData.error_description || authData.msg || "चुकीचा User ID किंवा Password.");
+        }
+
+        const token = authData.access_token;
+        const uid = authData.user.id;
+
+        // Fetch profile
+        const profResp = await fetch(`${getSbUrl()}/rest/v1/profiles?id=eq.${uid}&select=id,full_name,username,role,division_id,is_active`, {
+          headers: { "apikey": getSbKey(), "Authorization": `Bearer ${token}` }
+        });
+        const profiles = await profResp.json();
+        const profile = profiles?.[0] || { id: uid, full_name: identifier, username: identifier, role: "staff", is_active: true };
+
+        if (profile.is_active === false) {
+          throw new Error("हा User Inactive आहे. कृपया Admin / SDO शी संपर्क करा.");
+        }
+
+        // Fetch user_mappings
+        const mapResp = await fetch(`${getSbUrl()}/rest/v1/user_mappings?user_id=eq.${uid}&select=*`, {
+          headers: { "apikey": getSbKey(), "Authorization": `Bearer ${token}` }
+        });
+        const mappings = await mapResp.json();
+        const uMap = mappings?.[0] || {};
+
+        const sessionObj = {
+          access_token: token,
+          user_id: uid,
+          full_name: profile.full_name || identifier,
+          username: profile.username || identifier,
+          role: profile.role || "staff",
+          division_id: uMap.division_id || profile.division_id || null,
+          subdivision_id: uMap.subdivision_id || null,
+          branch_id: uMap.branch_id || null,
+          beat_id: uMap.beat_id || null
+        };
+
+        saveSession(sessionObj);
+        showToast(`स्वागत आहे, ${sessionObj.full_name}!`, "success");
+        enterAuthenticatedApp();
+      } catch (err) {
+        statusBox.innerHTML = `<span class="text-rose-600 font-semibold">Login Error: ${err.message}</span>`;
+        showToast(err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Login करा";
+      }
+    }
+
+    function handleLogout() {
+      clearSession();
+      document.getElementById("loginPassword").value = "";
+      document.getElementById("appSection").classList.add("hidden");
+      document.getElementById("authSection").classList.remove("hidden");
+      switchAuthTab("login");
+      showToast("यशस्वीरीत्या Logout झाले.", "info");
+    }
+
+    // 3. USER CREATION & AUTO USER ID GENERATION (SHARED BY PUBLIC & ADMIN)
+    function mountUserCreateForms() {
+      const tpl = document.getElementById("userCreateFormTemplate");
+      ["signupFormContainer", "adminUserFormContainer"].forEach(containerId => {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+        container.appendChild(tpl.content.cloneNode(true));
+      });
+    }
+
+    async function loadPublicOrgData() {
+      try {
+        const [divisions, subdivisions, branches, beats, profiles] = await Promise.all([
+          sbFetch("/rest/v1/divisions?select=*&order=name").catch(() => []),
+          sbFetch("/rest/v1/subdivisions?select=*&order=name").catch(() => []),
+          sbFetch("/rest/v1/branches?select=*&order=name").catch(() => []),
+          sbFetch("/rest/v1/beats?select=*&order=name").catch(() => []),
+          sbFetch("/rest/v1/profiles?select=id,full_name,username,role,division_id,is_active&order=full_name").catch(() => [])
+        ]);
+
+        orgData.divisions = divisions || [];
+        orgData.subdivisions = subdivisions || [];
+        orgData.branches = branches || [];
+        orgData.beats = beats || [];
+        orgData.profiles = profiles || [];
+
+        document.querySelectorAll(".user-create-form").forEach(form => {
+          populateFormDivisions(form);
+          onUserFormRoleOrOrgChange(form);
+          const statusEl = form.querySelector(".create-user-status");
+          statusEl.textContent = `तयार. (${orgData.divisions.length} Divisions, ${orgData.subdivisions.length} Subdivisions लोड)`;
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function populateFormDivisions(form) {
+      const divSel = form.elements["divisionId"];
+      divSel.innerHTML = `<option value="">— Division निवडा —</option>` +
+        orgData.divisions.map(d => `<option value="${d.id}">${d.name}${d.code ? ` (${d.code})` : ""}</option>`).join("");
+    }
+
+    function onUserFormDivChange(form) {
+      const divId = form.elements["divisionId"].value;
+      const subSel = form.elements["subdivisionId"];
+      const filtered = divId ? orgData.subdivisions.filter(s => s.division_id === divId) : [];
+      subSel.innerHTML = `<option value="">— Subdivision निवडा —</option>` +
+        filtered.map(s => `<option value="${s.id}">${s.name}${s.code ? ` (${s.code})` : ""}</option>`).join("");
+      onUserFormSubdivChange(form);
+    }
+
+    function onUserFormSubdivChange(form) {
+      const subId = form.elements["subdivisionId"].value;
+      const brSel = form.elements["branchId"];
+      const filtered = subId ? orgData.branches.filter(b => b.subdivision_id === subId) : [];
+      brSel.innerHTML = `<option value="">— Branch निवडा —</option>` +
+        filtered.map(b => `<option value="${b.id}">${b.name}${b.code ? ` (${b.code})` : ""}</option>`).join("");
+      onUserFormBranchChange(form);
+    }
+
+    function onUserFormBranchChange(form) {
+      const brId = form.elements["branchId"].value;
+      const btSel = form.elements["beatId"];
+      const filtered = brId ? orgData.beats.filter(bt => bt.branch_id === brId) : [];
+      btSel.innerHTML = `<option value="">— Beat निवडा —</option>` +
+        filtered.map(bt => `<option value="${bt.id}">${bt.name}${bt.code ? ` (${bt.code})` : ""}</option>`).join("");
+      onUserFormRoleOrOrgChange(form);
+    }
+
+    function officeToken(text, fallback, preferred) {
+      const s = text || "";
+      const m1 = s.match(new RegExp(`${preferred}\\d+`, "i"));
+      if (m1) return m1[0].toUpperCase();
+      const m2 = s.match(/DIV\d+|SD\d+|BR\d+|BT\d+/i);
+      if (m2) return m2[0].toUpperCase();
+      const clean = s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      return clean.slice(-6) || fallback;
+    }
+
+    function onUserFormRoleOrOrgChange(form) {
+      const role = form.elements["role"].value;
+      const divId = form.elements["divisionId"].value;
+      const subId = form.elements["subdivisionId"].value;
+      const brId = form.elements["branchId"].value;
+      const btId = form.elements["beatId"].value;
+
+      // Enable/disable dropdowns based on hierarchy
+      const enabled =
+        ["ce", "se", "ee1", "ee2"].includes(role) ? [] :
+        role === "division_officer" ? ["d"] :
+        ["sdo", "subdivision_officer"].includes(role) ? ["d", "s"] :
+        ["section_officer", "branch_officer"].includes(role) ? ["d", "s", "b"] :
+        ["d", "s", "b", "bt"];
+
+      form.elements["divisionId"].disabled = !enabled.includes("d");
+      form.elements["subdivisionId"].disabled = !enabled.includes("s");
+      form.elements["branchId"].disabled = !enabled.includes("b");
+      form.elements["beatId"].disabled = !enabled.includes("bt");
+
+      const d = orgData.divisions.find(x => x.id === divId);
+      const sub = orgData.subdivisions.find(x => x.id === subId);
+      const br = orgData.branches.find(x => x.id === brId);
+      const bt = orgData.beats.find(x => x.id === btId);
+
+      const parts = ["PLBC"];
+      if (role === "ce") parts.push("CE");
+      else if (role === "se") parts.push("SE");
+      else if (role === "ee1") parts.push("EE1");
+      else if (role === "ee2") parts.push("EE2");
+      else if (role === "sdo") parts.push("SDO");
+      else if (role === "section_officer") {
+        parts.push(officeToken(d?.code || d?.id || d?.name, "DIV", "DIV"), officeToken(sub?.code || sub?.name, "SD", "SD"), "SO");
+      } else if (role === "division_officer") {
+        parts.push(officeToken(d?.code || d?.id || d?.name, "DIV", "DIV"));
+      } else if (role === "subdivision_officer") {
+        parts.push(officeToken(d?.code || d?.id || d?.name, "DIV", "DIV"), officeToken(sub?.code || sub?.name, "SD", "SD"));
+      } else if (role === "branch_officer") {
+        parts.push(officeToken(d?.code || d?.id || d?.name, "DIV", "DIV"), officeToken(sub?.code || sub?.name, "SD", "SD"), officeToken(br?.code || br?.name, "BR", "BR"));
+      } else if (role === "beat_head") {
+        parts.push(officeToken(d?.code || d?.id || d?.name, "DIV", "DIV"), officeToken(sub?.code || sub?.name, "SD", "SD"), officeToken(br?.code || br?.name, "BR", "BR"), officeToken(bt?.code || bt?.name, "BT", "BT"));
+      } else {
+        parts.push(officeToken(d?.code || d?.id || d?.name, "DIV", "DIV"), officeToken(sub?.code || sub?.name, "SD", "SD"), officeToken(br?.code || br?.name, "BR", "BR"), "STAFF");
+      }
+
+      const prefix = parts.join("_") + "_";
+      let maxNum = 0;
+      orgData.profiles.forEach(p => {
+        if (p.username && p.username.toUpperCase().startsWith(prefix)) {
+          const suffix = parseInt(p.username.slice(prefix.length), 10);
+          if (!isNaN(suffix) && suffix > maxNum) maxNum = suffix;
+        }
+      });
+
+      form.elements["autoUsername"].value = prefix + String(maxNum + 1).padStart(3, "0");
+    }
+
+    async function handleCreateUserSubmit(e, form) {
+      e.preventDefault();
+      onUserFormRoleOrOrgChange(form);
+
+      const fullName = form.elements["fullName"].value.trim();
+      const role = form.elements["role"].value;
+      const username = form.elements["autoUsername"].value.trim().toLowerCase();
+      const password = form.elements["password"].value;
+      const divId = form.elements["divisionId"].value || null;
+      const subId = form.elements["subdivisionId"].value || null;
+      const brId = form.elements["branchId"].value || null;
+      const btId = form.elements["beatId"].value || null;
+      const statusBox = form.querySelector(".create-user-status");
+      const btn = form.elements["submitBtn"];
+
+      if (role === "sdo" && !subId) { statusBox.textContent = "Error: SDO साठी Subdivision निवडा."; return; }
+      if (role === "section_officer" && !brId) { statusBox.textContent = "Error: Section Officer साठी Branch निवडा."; return; }
+      if (role === "division_officer" && !divId) { statusBox.textContent = "Error: Division Officer साठी Division निवडा."; return; }
+      if (role === "subdivision_officer" && !subId) { statusBox.textContent = "Error: Subdivision Officer साठी Subdivision निवडा."; return; }
+      if (role === "branch_officer" && !brId) { statusBox.textContent = "Error: Branch Officer साठी Branch निवडा."; return; }
+      if (role === "beat_head" && !btId) { statusBox.textContent = "Error: Beat Head साठी Beat आवश्यक आहे."; return; }
+
+      const payload = {
+        full_name: fullName,
+        username: username,
+        password: password,
+        role: role,
+        division_id: ["ce", "se", "ee1", "ee2"].includes(role) ? null : divId,
+        subdivision_id: ["ce", "se", "ee1", "ee2", "division_officer"].includes(role) ? null : subId,
+        branch_id: ["section_officer", "branch_officer", "beat_head", "staff"].includes(role) ? brId : null,
+        beat_id: ["beat_head", "staff"].includes(role) ? btId : null
+      };
+
+      btn.disabled = true;
+      btn.textContent = "User तयार करत आहे...";
+      statusBox.textContent = "कृपया प्रतीक्षा करा...";
+
+      try {
+        const session = getSession();
+        if (session?.access_token) {
+          // Authenticated Admin/SDO call
+          await sbFetch("/functions/v1/admin-create-user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+        } else {
+          // Public Self-Signup
+          const signUpRes = await fetch(`${getSbUrl()}/auth/v1/signup`, {
+            method: "POST",
+            headers: {
+              "apikey": getSbKey(),
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              email: `${username}@plbc-login.invalid`,
+              password: password,
+              data: {
+                full_name: payload.full_name,
+                username: payload.username,
+                role: payload.role,
+                division_id: payload.division_id || "",
+                subdivision_id: payload.subdivision_id || "",
+                branch_id: payload.branch_id || "",
+                beat_id: payload.beat_id || ""
+              }
+            })
+          });
+          const signUpData = await signUpRes.json();
+          if (!signUpRes.ok) {
+            throw new Error(signUpData.msg || signUpData.error_description || signUpData.message || "Signup Error");
+          }
+        }
+
+        statusBox.innerHTML = `<span class="text-emerald-700 font-bold">यशस्वी! नवीन User ID: <code>${username}</code><br/>आता या User ID ने Login करा.</span>`;
+        showToast(`नवीन User तयार झाला: ${username}`, "success");
+        form.elements["fullName"].value = "";
+        form.elements["password"].value = "";
+        await loadPublicOrgData();
+      } catch (err) {
+        statusBox.innerHTML = `<span class="text-rose-600 font-semibold">Error: ${err.message}</span>`;
+        showToast(err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Create User";
+      }
+    }
+
+    // 4. AUTHENTICATED APP INITIALIZATION & ROLE PERMISSIONS
+    async function enterAuthenticatedApp() {
+      const session = getSession();
+      if (!session) return;
+
+      document.getElementById("authSection").classList.add("hidden");
+      document.getElementById("appSection").classList.remove("hidden");
+
+      document.getElementById("headerUserName").textContent = `${session.full_name} (${session.username})`;
+      document.getElementById("headerUserRole").textContent = session.role.replace("_", " ");
+
+      // Role-based tab visibility
+      const role = session.role;
+      const canMap = ["admin", "superadmin", "division_officer", "sdo", "subdivision_officer"].includes(role);
+      const canBeat = ["admin", "superadmin", "sdo", "subdivision_officer", "section_officer", "branch_officer"].includes(role);
+      const canUsers = ["admin", "superadmin", "sdo", "subdivision_officer"].includes(role);
+
+      document.getElementById("navTabMapping").classList.toggle("hidden", !canMap);
+      document.getElementById("navTabBeats").classList.toggle("hidden", !canBeat);
+      document.getElementById("navTabUsers").classList.toggle("hidden", !canUsers);
+
+      switchAppTab("dashboard");
+      await refreshAllAppData();
+    }
+
+    function switchAppTab(tabName) {
+      document.querySelectorAll(".app-view").forEach(v => v.classList.add("hidden"));
+      document.getElementById(`view-${tabName}`)?.classList.remove("hidden");
+
+      document.querySelectorAll(".nav-tab-btn").forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+          btn.className = "nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold bg-white text-wrdNavy shadow-sm";
+        } else {
+          btn.className = "nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10";
+        }
+      });
+    }
+
+    async function refreshAllAppData() {
+      try {
+        await loadPublicOrgData();
+        const [structures, mappings, events] = await Promise.all([
+          sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
+          sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
+          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks&order=event_time.desc&limit=50").catch(() => [])
+        ]);
+
+        orgData.structures = structures || [];
+        orgData.structureMappings = mappings || [];
+        orgData.operationEvents = events || [];
+
+        renderDashboardTables();
+        populateOperationStructures();
+        populateMappingScreen();
+        populateBeatMasterScreen();
+      } catch (err) {
+        showToast("डेटा रिफ्रेश करताना त्रुटी: " + err.message, "error");
+      }
+    }
+
+    // Filter structures visible to logged-in officer
+    function getAccessibleStructures() {
+      const session = getSession();
+      if (!session) return [];
+      const role = session.role;
+      const mapByStruct = new Map(orgData.structureMappings.map(m => [m.structure_id, m]));
+
+      if (["admin", "superadmin", "ce", "se", "ee1", "ee2"].includes(role)) {
+        return orgData.structures;
+      }
+      if (role === "division_officer" && session.division_id) {
+        return orgData.structures.filter(s => s.division_id === session.division_id);
+      }
+      if (["sdo", "subdivision_officer"].includes(role) && session.subdivision_id) {
+        return orgData.structures.filter(s => {
+          const m = mapByStruct.get(s.id);
+          return (m && m.subdivision_id === session.subdivision_id) || (!m && s.division_id === session.division_id);
+        });
+      }
+      if (["section_officer", "branch_officer"].includes(role) && session.branch_id) {
+        return orgData.structures.filter(s => mapByStruct.get(s.id)?.branch_id === session.branch_id);
+      }
+      if (["beat_head", "staff"].includes(role) && session.beat_id) {
+        return orgData.structures.filter(s => mapByStruct.get(s.id)?.beat_id === session.beat_id);
+      }
+      return orgData.structures;
+    }
+
+    // 5. DASHBOARD RENDERING
+    function renderDashboardTables() {
+      const structures = getAccessibleStructures();
+      const search = (document.getElementById("dashSearchInput")?.value || "").toLowerCase();
+      const filter = document.getElementById("dashStatusFilter")?.value || "all";
+
+      // KPIs
+      let activeCount = 0;
+      let totalDischarge = 0;
+      let tailCount = 0;
+
+      structures.forEach(s => {
+        const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+        if (isOn) activeCount++;
+        totalDischarge += Number(s.current_discharge_cfs || 0);
+        if (s.tail_reached) tailCount++;
+      });
+
+      document.getElementById("kpiTotalStructures").textContent = structures.length;
+      document.getElementById("kpiActiveStructures").textContent = activeCount;
+      document.getElementById("kpiTotalDischarge").textContent = totalDischarge.toFixed(2);
+      document.getElementById("kpiTailReached").textContent = tailCount;
+
+      const filtered = structures.filter(s => {
+        const matchesSearch = !search || `${s.id} ${s.name}`.toLowerCase().includes(search);
+        const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+        if (filter === "on") return matchesSearch && isOn;
+        if (filter === "off") return matchesSearch && !isOn;
+        if (filter === "tail") return matchesSearch && Boolean(s.tail_reached);
+        return matchesSearch;
+      });
+
+      const tbody = document.getElementById("structuresTableBody");
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">कोणतेही Structure आढळले नाही.</td></tr>`;
+      } else {
+        tbody.innerHTML = filtered.map(s => {
+          const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+          return `
+            <tr class="hover:bg-slate-50 transition">
+              <td class="py-3 px-4 font-bold text-slate-800">${s.id} — ${s.name || ""}</td>
+              <td class="py-3 px-4 text-slate-600">${s.structure_type || "-"} ${s.length_km ? `(${s.length_km} km)` : ""}</td>
+              <td class="py-3 px-4 font-semibold text-wrdNavy">${Number(s.current_discharge_cfs || 0).toFixed(2)} / <span class="text-slate-400 font-normal">${s.design_discharge_cfs || "-"} Cusecs</span></td>
+              <td class="py-3 px-4">
+                ${isOn
+                  ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">सुरू (ON)</span>`
+                  : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">बंद (OFF)</span>`}
+              </td>
+              <td class="py-3 px-4">
+                ${s.tail_reached
+                  ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">होय (Tail)</span>`
+                  : `<span class="text-xs text-slate-400">नाही</span>`}
+              </td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      // Events table
+      const evBody = document.getElementById("eventsTableBody");
+      const structMap = new Map(orgData.structures.map(s => [s.id, s.name]));
+      if (orgData.operationEvents.length === 0) {
+        evBody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">अद्याप कोणतीही संचालन नोंद नाही.</td></tr>`;
+      } else {
+        evBody.innerHTML = orgData.operationEvents.map(ev => {
+          const dt = ev.event_time ? new Date(ev.event_time).toLocaleString("en-IN") : "-";
+          return `
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-4 text-xs text-slate-500 whitespace-nowrap">${dt}</td>
+              <td class="py-2.5 px-4 font-semibold text-slate-800">${ev.structure_id} ${structMap.get(ev.structure_id) ? `— ${structMap.get(ev.structure_id)}` : ""}</td>
+              <td class="py-2.5 px-4"><span class="bg-sky-100 text-wrdNavy text-xs font-bold px-2 py-0.5 rounded">${ev.event_type || "-"}</span></td>
+              <td class="py-2.5 px-4 font-bold text-wrdAccent">${Number(ev.discharge_cfs || 0).toFixed(2)}</td>
+              <td class="py-2.5 px-4 text-slate-600">${ev.remarks || "-"}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+    }
+
+    // 6. CANAL OPERATION ENTRY & DIGITAL RECEIPT
+    function populateOperationStructures() {
+      const sel = document.getElementById("opStructureSelect");
+      const list = getAccessibleStructures();
+      sel.innerHTML = `<option value="">— Structure निवडा (${list.length} उपलब्ध) —</option>` +
+        list.map(s => `<option value="${s.id}">${s.id} — ${s.name}</option>`).join("");
+    }
+
+    function onOpStructureChange() {
+      const id = document.getElementById("opStructureSelect").value;
+      const s = orgData.structures.find(x => x.id === id);
+      const info = document.getElementById("opStructureInfo");
+      if (!s) {
+        info.textContent = "";
+        return;
+      }
+      info.textContent = `मंजूर विसर्ग: ${s.design_discharge_cfs || 0} Cusecs | सध्याची स्थिती: ${s.current_status || "OFF"} (${s.current_discharge_cfs || 0} Cusecs)`;
+      document.getElementById("opDischarge").value = s.current_discharge_cfs || "";
+      document.getElementById("opTailReached").value = s.tail_reached ? "true" : "false";
+    }
+
+    function onOpEventTypeChange() {
+      const evType = document.getElementById("opEventType").value;
+      if (evType === "CLOSE") {
+        document.getElementById("opDischarge").value = "0";
+        document.getElementById("opTailReached").value = "false";
+      }
+    }
+
+    async function submitCanalOperation(e) {
+      e.preventDefault();
+      const session = getSession();
+      const structureId = document.getElementById("opStructureSelect").value;
+      const eventType = document.getElementById("opEventType").value;
+      const discharge = parseFloat(document.getElementById("opDischarge").value || "0");
+      const tailReached = document.getElementById("opTailReached").value === "true";
+      const rotationDays = document.getElementById("opRotationDays").value ? parseInt(document.getElementById("opRotationDays").value, 10) : null;
+      const remarks = document.getElementById("opRemarks").value.trim();
+      const statusAfter = (eventType === "CLOSE" || discharge <= 0) ? "OFF" : "ON";
+      const btn = document.getElementById("btnSaveOperation");
+
+      if (!structureId) return;
+      btn.disabled = true;
+      btn.textContent = "नोंद Save होत आहे...";
+
+      try {
+        // 1. Insert event into canal_operation_events
+        await sbFetch("/rest/v1/canal_operation_events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify({
+            structure_id: structureId,
+            event_type: eventType,
+            status_after_event: statusAfter,
+            discharge_cfs: discharge,
+            rotation_period_days: rotationDays,
+            remarks: remarks || null,
+            recorded_by: session.user_id
+          })
+        });
+
+        // 2. Update structures current status & discharge
+        await sbFetch(`/rest/v1/structures?id=eq.${encodeURIComponent(structureId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify({
+            current_status: statusAfter,
+            current_discharge_cfs: discharge,
+            tail_reached: tailReached
+          })
+        });
+
+        // Generate Digital Receipt
+        const structObj = orgData.structures.find(s => s.id === structureId);
+        const nowStr = new Date().toLocaleString("en-IN");
+        document.getElementById("receiptBody").innerHTML = `
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">दिनांक व वेळ:</span><span class="font-bold">${nowStr}</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">Structure:</span><span class="font-bold text-wrdNavy">${structureId} — ${structObj?.name || ""}</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">संचालन प्रकार:</span><span class="font-bold">${eventType} (${statusAfter})</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">नोंदवलेला विसर्ग:</span><span class="font-bold text-wrdAccent text-base">${discharge.toFixed(2)} Cusecs</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">Tail Reached:</span><span class="font-bold">${tailReached ? "होय (YES)" : "नाही (NO)"}</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">शेरा:</span><span class="font-medium">${remarks || "-"}</span></div>
+          <div class="flex justify-between py-1"><span class="text-slate-500">नोंद करणारे अधिकारी:</span><span class="font-bold">${session.full_name}</span></div>
+        `;
+        document.getElementById("receiptActions").classList.remove("hidden");
+
+        showToast("विसर्ग नोंद यशस्वीरीत्या सेव्ह झाली व डिजिटल पावती तयार झाली!", "success");
+        await refreshAllAppData();
+      } catch (err) {
+        showToast("Save Error: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Operation नोंद Save करा व पावती तयार करा";
+      }
+    }
+
+    // 7. STRUCTURE -> SECTION OFFICER MAPPING
+    function populateMappingScreen() {
+      const structSel = document.getElementById("mapStructureSelect");
+      const subSel = document.getElementById("mapSubdivSelect");
+      const session = getSession();
+
+      structSel.innerHTML = `<option value="">— Structure निवडा —</option>` +
+        orgData.structures.map(s => `<option value="${s.id}">${s.id} — ${s.name}</option>`).join("");
+
+      const subdivs = (session?.subdivision_id && ["sdo", "subdivision_officer"].includes(session.role))
+        ? orgData.subdivisions.filter(sd => sd.id === session.subdivision_id)
+        : orgData.subdivisions;
+
+      subSel.innerHTML = `<option value="">— Subdivision निवडा —</option>` +
+        subdivs.map(sd => `<option value="${sd.id}">${sd.name}</option>`).join("");
+
+      if (subdivs.length === 1) {
+        subSel.value = subdivs[0].id;
+        onMapSubdivChange();
+      }
+
+      const mappedCount = orgData.structureMappings.length;
+      const totalCount = orgData.structures.length;
+      document.getElementById("mappingStatusBox").textContent =
+        `${totalCount} Structures लोड. ${mappedCount} mapped / ${Math.max(0, totalCount - mappedCount)} unmapped.`;
+    }
+
+    function onMapStructureSelect() {
+      const structId = document.getElementById("mapStructureSelect").value;
+      const existing = orgData.structureMappings.find(m => m.structure_id === structId);
+      if (existing) {
+        if (existing.subdivision_id) {
+          document.getElementById("mapSubdivSelect").value = existing.subdivision_id;
+          onMapSubdivChange();
+        }
+        if (existing.branch_id) {
+          document.getElementById("mapBranchSelect").value = existing.branch_id;
+          onMapBranchChange();
+        }
+        if (existing.beat_id) {
+          document.getElementById("mapBeatSelect").value = existing.beat_id;
+        }
+      }
+    }
+
+    function onMapSubdivChange() {
+      const subId = document.getElementById("mapSubdivSelect").value;
+      const brSel = document.getElementById("mapBranchSelect");
+      const filtered = subId ? orgData.branches.filter(b => b.subdivision_id === subId) : [];
+      brSel.innerHTML = `<option value="">— Branch / Section Officer निवडा —</option>` +
+        filtered.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+      onMapBranchChange();
+    }
+
+    function onMapBranchChange() {
+      const brId = document.getElementById("mapBranchSelect").value;
+      const btSel = document.getElementById("mapBeatSelect");
+      const filtered = brId ? orgData.beats.filter(bt => bt.branch_id === brId) : [];
+      btSel.innerHTML = `<option value="">— बीट (ऐच्छिक) —</option>` +
+        filtered.map(bt => `<option value="${bt.id}">${bt.name}</option>`).join("");
+    }
+
+    async function saveStructureMapping(e) {
+      e.preventDefault();
+      const structureId = document.getElementById("mapStructureSelect").value;
+      const subdivId = document.getElementById("mapSubdivSelect").value || null;
+      const branchId = document.getElementById("mapBranchSelect").value || null;
+      const beatId = document.getElementById("mapBeatSelect").value || null;
+      const statusBox = document.getElementById("mappingStatusBox");
+      const btn = document.getElementById("btnSaveMapping");
+
+      if (!structureId || !subdivId) return;
+      btn.disabled = true;
+      btn.textContent = "Mapping सेव्ह होत आहे...";
+
+      try {
+        await sbFetch("/rest/v1/plbc_structure_mapping?on_conflict=structure_id", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates,return=minimal"
+          },
+          body: JSON.stringify({
+            structure_id: structureId,
+            subdivision_id: subdivId,
+            branch_id: branchId,
+            beat_id: beatId
+          })
+        });
+
+        statusBox.innerHTML = `<span class="text-emerald-700 font-bold">Structure ${structureId} चे Section Officer Mapping यशस्वीरीत्या सेव्ह झाले.</span>`;
+        showToast(`Structure ${structureId} मॅपिंग सेव्ह झाले!`, "success");
+        await refreshAllAppData();
+      } catch (err) {
+        statusBox.innerHTML = `<span class="text-rose-600 font-semibold">Save error: ${err.message}</span>`;
+        showToast(err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save Structure Mapping";
+      }
+    }
+
+    // 8. BEAT MASTER
+    function populateBeatMasterScreen() {
+      const brSel = document.getElementById("beatBranchSelect");
+      brSel.innerHTML = `<option value="">— Branch निवडा —</option>` +
+        orgData.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join("");
+
+      document.getElementById("beatTotalCount").textContent = orgData.beats.length;
+      const brMap = new Map(orgData.branches.map(b => [b.id, b.name]));
+      document.getElementById("beatsListPreview").innerHTML = orgData.beats.map(bt => `
+        <div class="p-2.5 flex justify-between items-center">
+          <span class="font-semibold text-slate-800">${bt.name} ${bt.code ? `(${bt.code})` : ""}</span>
+          <span class="text-slate-500 text-[11px]">${brMap.get(bt.branch_id) || ""}</span>
+        </div>
+      `).join("") || `<div class="p-4 text-center text-slate-400">कोणतेही Beat उपलब्ध नाही.</div>`;
+    }
+
+    async function createNewBeat(e) {
+      e.preventDefault();
+      const branchId = document.getElementById("beatBranchSelect").value;
+      const name = document.getElementById("beatNameInput").value.trim();
+      const code = document.getElementById("beatCodeInput").value.trim() || null;
+      const btn = document.getElementById("btnSaveBeat");
+
+      if (!branchId || !name) return;
+      btn.disabled = true;
+      btn.textContent = "Beat Save होत आहे...";
+
+      try {
+        await sbFetch("/rest/v1/beats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
+          body: JSON.stringify({ branch_id: branchId, name, code })
+        });
+        document.getElementById("beatNameInput").value = "";
+        document.getElementById("beatCodeInput").value = "";
+        showToast("नवीन Beat यशस्वीरीत्या जोडला गेला!", "success");
+        await refreshAllAppData();
+      } catch (err) {
+        showToast("Beat Error: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "नवीन Beat Save करा";
+      }
+    }
+
+    // 9. BOOTSTRAP ON PAGE LOAD
+    window.addEventListener("DOMContentLoaded", async () => {
+      document.getElementById("cfgUrl").value = getSbUrl();
+      document.getElementById("cfgKey").value = getSbKey();
+      mountUserCreateForms();
+
+      const session = getSession();
+      if (session && session.access_token) {
+        await enterAuthenticatedApp();
+      } else {
+        await loadPublicOrgData();
+      }
+    });
+  </script>
+</body>
+</html>
