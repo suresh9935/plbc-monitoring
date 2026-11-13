@@ -1166,18 +1166,21 @@
       const search = (document.getElementById("dashSearchInput")?.value || "").toLowerCase();
       const filter = document.getElementById("dashStatusFilter")?.value || "all";
 
-      // KPIs
+      // KPIs (CR - Cross Regulator वगळून फक्त वितरिका/शाखा कालव्यांचाच विसर्ग मोजा)
       let activeCount = 0;
       let totalDischarge = 0;
       let tailCount = 0;
 
       structures.forEach(s => {
+        const isCR = (s.id || "").toUpperCase().startsWith("CR") ||
+                     (s.structure_type || "").toLowerCase().includes("cross regulator");
         const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
         if (isOn) activeCount++;
-        totalDischarge += Number(s.current_discharge_cfs || 0);
+        if (!isCR) {
+          totalDischarge += Number(s.current_discharge_cfs || 0);
+        }
         if (s.tail_reached) tailCount++;
       });
-
       document.getElementById("kpiTotalStructures").textContent = structures.length;
       document.getElementById("kpiActiveStructures").textContent = activeCount;
       document.getElementById("kpiTotalDischarge").textContent = totalDischarge.toFixed(2);
