@@ -1060,15 +1060,24 @@
       document.getElementById("headerUserName").textContent = `${session.full_name} (${session.username})`;
       document.getElementById("headerUserRole").textContent = session.role.replace("_", " ");
 
-      // Role-based tab visibility (फक्त Admin आणि SDO यांनाच Mapping, Beat Master व User Creation दिसेल; EE, SE, CE यांना नाही)
-      const role = (session.role || "").toLowerCase();
+      // Role-based tab visibility (फक्त Admin आणि SDO यांनाच Mapping, Beat Master व User Creation दिसेल; EE, SE, CE यांना १००% बंद)
+      const role = (session.role || "").trim().toLowerCase();
       const canMap = ["admin", "superadmin", "sdo", "subdivision_officer"].includes(role);
       const canBeat = ["admin", "superadmin", "sdo", "subdivision_officer", "section_officer", "branch_officer"].includes(role);
       const canUsers = ["admin", "superadmin", "sdo", "subdivision_officer"].includes(role);
 
-      document.getElementById("navTabMapping").classList.toggle("hidden", !canMap);
-      document.getElementById("navTabBeats").classList.toggle("hidden", !canBeat);
-      document.getElementById("navTabUsers").classList.toggle("hidden", !canUsers);
+      const elMap = document.getElementById("navTabMapping");
+      const elBeat = document.getElementById("navTabBeats");
+      const elUsers = document.getElementById("navTabUsers");
+
+      elMap.classList.toggle("hidden", !canMap);
+      elMap.style.display = canMap ? "" : "none";
+
+      elBeat.classList.toggle("hidden", !canBeat);
+      elBeat.style.display = canBeat ? "" : "none";
+
+      elUsers.classList.toggle("hidden", !canUsers);
+      elUsers.style.display = canUsers ? "" : "none";
 
       switchAppTab("dashboard");
       await refreshAllAppData();
@@ -1173,8 +1182,7 @@
 
       const isCR = (s) => (s.id || "").toUpperCase().startsWith("CR") ||
                           (s.structure_type || "").toLowerCase().includes("cross regulator");
-      const isHeadMC = (s) => (s.id || "").toUpperCase() === "MC-01" ||
-                              (s.structure_type || "").toLowerCase().includes("main canal");
+      const isHeadMC = (s) => (s.id || "").trim().toUpperCase() === "MC-01";
 
       // MC-01 (धरणातून कालव्यामध्ये सोडलेला मुख्य विसर्ग)
       const mc01 = structures.find(s => isHeadMC(s));
