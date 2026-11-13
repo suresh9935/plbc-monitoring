@@ -200,13 +200,13 @@
           <button data-tab="operation" onclick="switchAppTab('operation')" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             💧 विसर्ग / कालवा संचालन नोंद
           </button>
-          <button data-tab="mapping" id="navTabMapping" onclick="switchAppTab('mapping')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+          <button data-tab="mapping" id="navTabMapping" onclick="switchAppTab('mapping')" style="display:none;" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             🗺️ Structure → Section Officer Mapping
           </button>
-          <button data-tab="beats" id="navTabBeats" onclick="switchAppTab('beats')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+          <button data-tab="beats" id="navTabBeats" onclick="switchAppTab('beats')" style="display:none;" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             📍 Beat Master
           </button>
-          <button data-tab="users" id="navTabUsers" onclick="switchAppTab('users')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+          <button data-tab="users" id="navTabUsers" onclick="switchAppTab('users')" style="display:none;" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             👤 + नवीन User तयार करा
           </button>
         </div>
@@ -1099,13 +1099,31 @@
     async function refreshAllAppData() {
       try {
         await loadPublicOrgData();
-        const [structures, mappings, events] = await Promise.all([
+        const [structures, opStates, mappings, events] = await Promise.all([
           sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
+          sbFetch("/rest/v1/distributary_operation_state?select=structure_id,status,current_discharge_cfs,tail_reached").catch(() => []),
           sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
           sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks&order=event_time.desc&limit=50").catch(() => [])
         ]);
 
-        orgData.structures = structures || [];
+        // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन (Merge) करा जेणेकरून Android App आणि Web दोन्हीकडे 100% समान डेटा दिसेल
+        const stateMap = new Map((opStates || []).map(st => [st.structure_id, st]));
+        orgData.structures = (structures || []).map(s => {
+          const op = stateMap.get(s.id);
+          if (!op) return s;
+          const liveFlow = Math.max(Number(s.current_discharge_cfs || 0), Number(op.current_discharge_cfs || 0));
+          const isLiveOn = (op.status || "").toLowerCase() === "running" ||
+                           (op.status || "").toLowerCase() === "on" ||
+                           (s.current_status || "").toUpperCase() === "ON" ||
+                           liveFlow > 0;
+          return {
+            ...s,
+            current_status: isLiveOn ? "ON" : "OFF",
+            current_discharge_cfs: liveFlow,
+            tail_reached: Boolean(s.tail_reached || op.tail_reached)
+          };
+        });
+
         orgData.structureMappings = mappings || [];
         orgData.operationEvents = events || [];
 
@@ -1364,6 +1382,21 @@
             tail_reached: tailReached
           })
         });
+
+        // 3. Sync distributary_operation_state as well so Android App & Web stay 100% synchronized
+        await sbFetch("/rest/v1/distributary_operation_state?on_conflict=structure_id", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates,return=minimal"
+          },
+          body: JSON.stringify({
+            structure_id: structureId,
+            status: statusAfter === "ON" ? "running" : "closed",
+            current_discharge_cfs: discharge,
+            tail_reached: tailReached
+          })
+        }).catch(() => {});
 
         // Generate Digital Receipt
         const structObj = orgData.structures.find(s => s.id === structureId);
