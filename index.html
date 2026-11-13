@@ -218,27 +218,31 @@
 
       <!-- ==================== TAB 1: DASHBOARD ==================== -->
       <section id="view-dashboard" class="app-view space-y-6">
-        <!-- KPI Summary Cards -->
+        <!-- Clickable KPI Summary Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+          <div id="kpiCardAll" onclick="applyKpiStatusFilter('all')"
+            class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-wrdNavy ring-2 ring-wrdNavy/10 transition hover:shadow-md">
             <p class="text-xs font-semibold text-slate-500">एकूण Structures</p>
             <p id="kpiTotalStructures" class="text-2xl sm:text-3xl font-bold text-wrdNavy mt-1">0</p>
-            <p class="text-[11px] text-slate-400 mt-1">वितरिका व लघुकालवे</p>
+            <p class="text-[11px] text-slate-400 mt-1">क्लिक करा: संपूर्ण यादी</p>
           </div>
-          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+          <div id="kpiCardOn" onclick="applyKpiStatusFilter('on')"
+            class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-slate-200 hover:border-emerald-500 transition hover:shadow-md">
             <p class="text-xs font-semibold text-slate-500">सुरू असलेले (ON)</p>
             <p id="kpiActiveStructures" class="text-2xl sm:text-3xl font-bold text-emerald-600 mt-1">0</p>
-            <p class="text-[11px] text-emerald-700/70 mt-1">सध्या पाणी सुरू</p>
+            <p class="text-[11px] text-emerald-700/80 mt-1">क्लिक करा: फक्त सुरू वर</p>
           </div>
-          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+          <div onclick="applyKpiStatusFilter('on')"
+            class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-slate-200 hover:border-sky-400 transition hover:shadow-md">
             <p class="text-xs font-semibold text-slate-500">एकूण चालू विसर्ग</p>
             <p id="kpiTotalDischarge" class="text-2xl sm:text-3xl font-bold text-wrdAccent mt-1">0.0</p>
             <p class="text-[11px] text-slate-400 mt-1">Cusecs (क्युसेक्स)</p>
           </div>
-          <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+          <div id="kpiCardTail" onclick="applyKpiStatusFilter('tail')"
+            class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-slate-200 hover:border-indigo-500 transition hover:shadow-md">
             <p class="text-xs font-semibold text-slate-500">Tail Reached (टेल)</p>
             <p id="kpiTailReached" class="text-2xl sm:text-3xl font-bold text-indigo-600 mt-1">0</p>
-            <p class="text-[11px] text-slate-400 mt-1">शेवटपर्यंत पाणी पोहोचले</p>
+            <p class="text-[11px] text-slate-400 mt-1">क्लिक करा: Tail यादी</p>
           </div>
         </div>
 
@@ -246,15 +250,19 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 class="text-base sm:text-lg font-bold text-slate-800">Structures सद्यस्थिती (Live Status)</h2>
-              <p class="text-xs text-slate-500">सध्याचा विसर्ग, स्थिती आणि टेल रिच माहिती</p>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-base sm:text-lg font-bold text-slate-800">Structures सद्यस्थिती (Live Status)</h2>
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">● सुरू (वर)</span>
+                <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800">● बंद (खाली)</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">सध्याचा विसर्ग, स्थिती आणि टेल रिच माहिती (सुरू असलेले स्ट्रक्चर नेहमी वर दिसतील)</p>
             </div>
             <div class="flex flex-wrap gap-2">
               <input id="dashSearchInput" type="text" oninput="renderDashboardTables()" placeholder="Structure नाव / ID शोधा..."
                 class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
-              <select id="dashStatusFilter" onchange="renderDashboardTables()"
+              <select id="dashStatusFilter" onchange="onDashDropdownFilterChange()"
                 class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
-                <option value="all">सर्व स्थिती (All)</option>
+                <option value="all">सर्व स्थिती (सुरू वर + बंद खाली)</option>
                 <option value="on">फक्त सुरू (ON)</option>
                 <option value="off">फक्त बंद (OFF)</option>
                 <option value="tail">Tail Reached</option>
@@ -273,7 +281,7 @@
                   <th class="py-3 px-4 font-bold">Tail Reach</th>
                 </tr>
               </thead>
-              <tbody id="structuresTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
+              <tbody id="structuresTableBody" class="divide-y divide-slate-200/70 text-xs sm:text-sm">
                 <tr><td colspan="5" class="py-6 text-center text-slate-400">डेटा लोड होत आहे...</td></tr>
               </tbody>
             </table>
@@ -1103,10 +1111,10 @@
       const role = session.role;
       const mapByStruct = new Map(orgData.structureMappings.map(m => [m.structure_id, m]));
 
-      if (["admin", "superadmin", "ce", "se", "ee1", "ee2"].includes(role)) {
+      if (["admin", "superadmin", "ce", "se"].includes(role)) {
         return orgData.structures;
       }
-      if (role === "division_officer" && session.division_id) {
+      if (["division_officer", "ee1", "ee2"].includes(role) && session.division_id) {
         return orgData.structures.filter(s => s.division_id === session.division_id);
       }
       if (["sdo", "subdivision_officer"].includes(role) && session.subdivision_id) {
@@ -1124,7 +1132,35 @@
       return orgData.structures;
     }
 
-    // 5. DASHBOARD RENDERING
+    // KPI Card click & dropdown synchronization
+    function applyKpiStatusFilter(filterVal) {
+      const sel = document.getElementById("dashStatusFilter");
+      if (sel) sel.value = filterVal;
+      updateKpiCardHighlight(filterVal);
+      renderDashboardTables();
+    }
+
+    function onDashDropdownFilterChange() {
+      const filterVal = document.getElementById("dashStatusFilter")?.value || "all";
+      updateKpiCardHighlight(filterVal);
+      renderDashboardTables();
+    }
+
+    function updateKpiCardHighlight(filterVal) {
+      const cAll = document.getElementById("kpiCardAll");
+      const cOn = document.getElementById("kpiCardOn");
+      const cTail = document.getElementById("kpiCardTail");
+      if (!cAll || !cOn || !cTail) return;
+
+      cAll.className = "cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 transition hover:shadow-md " +
+        (filterVal === "all" ? "border-wrdNavy ring-2 ring-wrdNavy/15" : "border-slate-200 hover:border-wrdNavy/50");
+      cOn.className = "cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 transition hover:shadow-md " +
+        (filterVal === "on" ? "border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/40" : "border-slate-200 hover:border-emerald-500");
+      cTail.className = "cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 transition hover:shadow-md " +
+        (filterVal === "tail" ? "border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/40" : "border-slate-200 hover:border-indigo-500");
+    }
+
+    // 5. DASHBOARD RENDERING (सुरू वर + Colour Coding)
     function renderDashboardTables() {
       const structures = getAccessibleStructures();
       const search = (document.getElementById("dashSearchInput")?.value || "").toLowerCase();
@@ -1147,14 +1183,22 @@
       document.getElementById("kpiTotalDischarge").textContent = totalDischarge.toFixed(2);
       document.getElementById("kpiTailReached").textContent = tailCount;
 
-      const filtered = structures.filter(s => {
-        const matchesSearch = !search || `${s.id} ${s.name}`.toLowerCase().includes(search);
-        const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
-        if (filter === "on") return matchesSearch && isOn;
-        if (filter === "off") return matchesSearch && !isOn;
-        if (filter === "tail") return matchesSearch && Boolean(s.tail_reached);
-        return matchesSearch;
-      });
+      // Filter + Sort: सुरू (ON) नेहमी वर आणि बंद (OFF) खाली
+      const filtered = structures
+        .filter(s => {
+          const matchesSearch = !search || `${s.id} ${s.name}`.toLowerCase().includes(search);
+          const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+          if (filter === "on") return matchesSearch && isOn;
+          if (filter === "off") return matchesSearch && !isOn;
+          if (filter === "tail") return matchesSearch && Boolean(s.tail_reached);
+          return matchesSearch;
+        })
+        .sort((a, b) => {
+          const aOn = ((a.current_status || "").toUpperCase() === "ON" || Number(a.current_discharge_cfs) > 0) ? 1 : 0;
+          const bOn = ((b.current_status || "").toUpperCase() === "ON" || Number(b.current_discharge_cfs) > 0) ? 1 : 0;
+          if (bOn !== aOn) return bOn - aOn; // सुरू (ON) प्रथम वर
+          return (a.id || "").localeCompare(b.id || "", undefined, { numeric: true });
+        });
 
       const tbody = document.getElementById("structuresTableBody");
       if (filtered.length === 0) {
@@ -1162,20 +1206,23 @@
       } else {
         tbody.innerHTML = filtered.map(s => {
           const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+          const rowClass = isOn
+            ? "bg-emerald-50/90 hover:bg-emerald-100/70 border-l-4 border-l-emerald-600 transition"
+            : "bg-rose-50/60 hover:bg-rose-100/50 border-l-4 border-l-rose-400 transition";
           return `
-            <tr class="hover:bg-slate-50 transition">
-              <td class="py-3 px-4 font-bold text-slate-800">${s.id} — ${s.name || ""}</td>
-              <td class="py-3 px-4 text-slate-600">${s.structure_type || "-"} ${s.length_km ? `(${s.length_km} km)` : ""}</td>
-              <td class="py-3 px-4 font-semibold text-wrdNavy">${Number(s.current_discharge_cfs || 0).toFixed(2)} / <span class="text-slate-400 font-normal">${s.design_discharge_cfs || "-"} Cusecs</span></td>
+            <tr class="${rowClass}">
+              <td class="py-3 px-4 font-bold text-slate-900">${s.id} — ${s.name || ""}</td>
+              <td class="py-3 px-4 text-slate-700">${s.structure_type || "-"} ${s.length_km ? `(${s.length_km} km)` : ""}</td>
+              <td class="py-3 px-4 font-semibold ${isOn ? "text-emerald-900" : "text-wrdNavy"}">${Number(s.current_discharge_cfs || 0).toFixed(2)} / <span class="text-slate-500 font-normal">${s.design_discharge_cfs || "-"} Cusecs</span></td>
               <td class="py-3 px-4">
                 ${isOn
-                  ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">सुरू (ON)</span>`
-                  : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-700">बंद (OFF)</span>`}
+                  ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">सुरू (ON)</span>`
+                  : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm">बंद (OFF)</span>`}
               </td>
               <td class="py-3 px-4">
                 ${s.tail_reached
                   ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">होय (Tail)</span>`
-                  : `<span class="text-xs text-slate-400">नाही</span>`}
+                  : `<span class="text-xs text-slate-500">नाही</span>`}
               </td>
             </tr>
           `;
