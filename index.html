@@ -1160,46 +1160,62 @@
         (filterVal === "tail" ? "border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/40" : "border-slate-200 hover:border-indigo-500");
     }
 
-    // 5. DASHBOARD RENDERING (सुरू वर + Colour Coding)
+    // 5. DASHBOARD RENDERING (MC-01 सर्वात वर + सुरू वर + CR वगळून अचूक मोजणी + Colour Coding)
     function renderDashboardTables() {
       const structures = getAccessibleStructures();
       const search = (document.getElementById("dashSearchInput")?.value || "").toLowerCase();
       const filter = document.getElementById("dashStatusFilter")?.value || "all";
 
-      // KPIs (CR - Cross Regulator वगळून फक्त वितरिका/शाखा कालव्यांचाच विसर्ग मोजा)
+      const isCR = (s) => (s.id || "").toUpperCase().startsWith("CR") ||
+                          (s.structure_type || "").toLowerCase().includes("cross regulator");
+      const isHeadMC = (s) => (s.id || "").toUpperCase() === "MC-01" ||
+                              (s.structure_type || "").toLowerCase().includes("main canal");
+
+      // MC-01 (धरणातून कालव्यामध्ये सोडलेला मुख्य विसर्ग)
+      const mc01 = structures.find(s => isHeadMC(s));
+      const mc01Discharge = mc01 ? Number(mc01.current_discharge_cfs || 0) : 0;
+
+      // KPIs (CR आणि MC-01 वगळून फक्त वितरिका/शाखा कालव्यांचीच अचूक मोजणी)
       let activeCount = 0;
       let totalDischarge = 0;
       let tailCount = 0;
 
       structures.forEach(s => {
-        const isCR = (s.id || "").toUpperCase().startsWith("CR") ||
-                     (s.structure_type || "").toLowerCase().includes("cross regulator");
+        if (isCR(s) || isHeadMC(s)) return;
         const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
         if (isOn) activeCount++;
-        if (!isCR) {
-          totalDischarge += Number(s.current_discharge_cfs || 0);
-        }
+        totalDischarge += Number(s.current_discharge_cfs || 0);
         if (s.tail_reached) tailCount++;
       });
+
       document.getElementById("kpiTotalStructures").textContent = structures.length;
       document.getElementById("kpiActiveStructures").textContent = activeCount;
-      document.getElementById("kpiTotalDischarge").textContent = totalDischarge.toFixed(2);
+      document.getElementById("kpiTotalDischarge").innerHTML =
+        `${totalDischarge.toFixed(2)} <span class="block text-[11px] font-bold text-sky-700 mt-1">MC-01 धरणातून विसर्ग: ${mc01Discharge.toFixed(2)} Cusecs</span>`;
       document.getElementById("kpiTailReached").textContent = tailCount;
 
-      // Filter + Sort: सुरू (ON) नेहमी वर आणि बंद (OFF) खाली
+      // Filter + Sort:
+      // 1) MC-01 (धरणातून सोडलेला विसर्ग) नेहमी सर्वात वर (#1)
+      // 2) त्यानंतर सुरू (ON) असलेले स्ट्रक्चर्स
+      // 3) त्यानंतर बंद (OFF) असलेले स्ट्रक्चर्स
       const filtered = structures
         .filter(s => {
           const matchesSearch = !search || `${s.id} ${s.name}`.toLowerCase().includes(search);
           const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
-          if (filter === "on") return matchesSearch && isOn;
+          if (filter === "on") return matchesSearch && isOn && !isCR(s);
           if (filter === "off") return matchesSearch && !isOn;
-          if (filter === "tail") return matchesSearch && Boolean(s.tail_reached);
+          if (filter === "tail") return matchesSearch && Boolean(s.tail_reached) && !isCR(s);
           return matchesSearch;
         })
         .sort((a, b) => {
+          const aHead = isHeadMC(a) ? 1 : 0;
+          const bHead = isHeadMC(b) ? 1 : 0;
+          if (bHead !== aHead) return bHead - aHead; // MC-01 नेहमी सर्वात वर
+
           const aOn = ((a.current_status || "").toUpperCase() === "ON" || Number(a.current_discharge_cfs) > 0) ? 1 : 0;
           const bOn = ((b.current_status || "").toUpperCase() === "ON" || Number(b.current_discharge_cfs) > 0) ? 1 : 0;
           if (bOn !== aOn) return bOn - aOn; // सुरू (ON) प्रथम वर
+
           return (a.id || "").localeCompare(b.id || "", undefined, { numeric: true });
         });
 
@@ -1208,15 +1224,21 @@
         tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">कोणतेही Structure आढळले नाही.</td></tr>`;
       } else {
         tbody.innerHTML = filtered.map(s => {
+          const isHead = isHeadMC(s);
           const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
-          const rowClass = isOn
-            ? "bg-emerald-50/90 hover:bg-emerald-100/70 border-l-4 border-l-emerald-600 transition"
-            : "bg-rose-50/60 hover:bg-rose-100/50 border-l-4 border-l-rose-400 transition";
+          const rowClass = isHead
+            ? "bg-sky-100/90 hover:bg-sky-200/70 border-l-4 border-l-sky-700 transition"
+            : (isOn
+              ? "bg-emerald-50/90 hover:bg-emerald-100/70 border-l-4 border-l-emerald-600 transition"
+              : "bg-rose-50/60 hover:bg-rose-100/50 border-l-4 border-l-rose-400 transition");
+          const headBadge = isHead
+            ? `<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-sky-700 text-white">धरणातून मुख्य विसर्ग</span>`
+            : "";
           return `
             <tr class="${rowClass}">
-              <td class="py-3 px-4 font-bold text-slate-900">${s.id} — ${s.name || ""}</td>
+              <td class="py-3 px-4 font-bold text-slate-900">${s.id} — ${s.name || ""}${headBadge}</td>
               <td class="py-3 px-4 text-slate-700">${s.structure_type || "-"} ${s.length_km ? `(${s.length_km} km)` : ""}</td>
-              <td class="py-3 px-4 font-semibold ${isOn ? "text-emerald-900" : "text-wrdNavy"}">${Number(s.current_discharge_cfs || 0).toFixed(2)} / <span class="text-slate-500 font-normal">${s.design_discharge_cfs || "-"} Cusecs</span></td>
+              <td class="py-3 px-4 font-semibold ${isHead ? "text-sky-900" : (isOn ? "text-emerald-900" : "text-wrdNavy")}">${Number(s.current_discharge_cfs || 0).toFixed(2)} / <span class="text-slate-500 font-normal">${s.design_discharge_cfs || "-"} Cusecs</span></td>
               <td class="py-3 px-4">
                 ${isOn
                   ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">सुरू (ON)</span>`
