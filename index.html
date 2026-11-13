@@ -1060,9 +1060,9 @@
       document.getElementById("headerUserName").textContent = `${session.full_name} (${session.username})`;
       document.getElementById("headerUserRole").textContent = session.role.replace("_", " ");
 
-      // Role-based tab visibility
-      const role = session.role;
-      const canMap = ["admin", "superadmin", "division_officer", "sdo", "subdivision_officer"].includes(role);
+      // Role-based tab visibility (फक्त Admin आणि SDO यांनाच Mapping, Beat Master व User Creation दिसेल; EE, SE, CE यांना नाही)
+      const role = (session.role || "").toLowerCase();
+      const canMap = ["admin", "superadmin", "sdo", "subdivision_officer"].includes(role);
       const canBeat = ["admin", "superadmin", "sdo", "subdivision_officer", "section_officer", "branch_officer"].includes(role);
       const canUsers = ["admin", "superadmin", "sdo", "subdivision_officer"].includes(role);
 
