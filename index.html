@@ -218,8 +218,13 @@
 
       <!-- ==================== TAB 1: DASHBOARD ==================== -->
       <section id="view-dashboard" class="app-view space-y-6">
-        <!-- Clickable KPI Summary Cards -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <!-- Clickable KPI Summary Cards (धरणातून विसर्ग स्वतंत्र + वितरिका विसर्ग स्वतंत्र) -->
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          <div class="bg-gradient-to-br from-sky-50 to-blue-100/70 rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-sky-600 transition hover:shadow-md">
+            <p class="text-xs font-bold text-sky-900">धरणातून सोडलेला विसर्ग (MC-01)</p>
+            <p id="kpiHeadMcDischarge" class="text-2xl sm:text-3xl font-bold text-sky-700 mt-1">0.00</p>
+            <p id="kpiHeadMcStatus" class="text-[11px] font-semibold text-sky-800/80 mt-1">Main Canal Head (Cusecs)</p>
+          </div>
           <div id="kpiCardAll" onclick="applyKpiStatusFilter('all')"
             class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-wrdNavy ring-2 ring-wrdNavy/10 transition hover:shadow-md">
             <p class="text-xs font-semibold text-slate-500">एकूण Structures</p>
@@ -228,15 +233,15 @@
           </div>
           <div id="kpiCardOn" onclick="applyKpiStatusFilter('on')"
             class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-slate-200 hover:border-emerald-500 transition hover:shadow-md">
-            <p class="text-xs font-semibold text-slate-500">सुरू असलेले (ON)</p>
+            <p class="text-xs font-semibold text-slate-500">सुरू वितरिका (ON)</p>
             <p id="kpiActiveStructures" class="text-2xl sm:text-3xl font-bold text-emerald-600 mt-1">0</p>
-            <p class="text-[11px] text-emerald-700/80 mt-1">क्लिक करा: फक्त सुरू वर</p>
+            <p class="text-[11px] text-emerald-700/80 mt-1">CR व MC-01 वगळून</p>
           </div>
           <div onclick="applyKpiStatusFilter('on')"
             class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-slate-200 hover:border-sky-400 transition hover:shadow-md">
-            <p class="text-xs font-semibold text-slate-500">एकूण चालू विसर्ग</p>
-            <p id="kpiTotalDischarge" class="text-2xl sm:text-3xl font-bold text-wrdAccent mt-1">0.0</p>
-            <p class="text-[11px] text-slate-400 mt-1">Cusecs (क्युसेक्स)</p>
+            <p class="text-xs font-semibold text-slate-500">वितरिका चालू विसर्ग</p>
+            <p id="kpiTotalDischarge" class="text-2xl sm:text-3xl font-bold text-wrdAccent mt-1">0.00</p>
+            <p class="text-[11px] text-slate-400 mt-1">फक्त वितरिका बेरीज (Cusecs)</p>
           </div>
           <div id="kpiCardTail" onclick="applyKpiStatusFilter('tail')"
             class="cursor-pointer bg-white rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-slate-200 hover:border-indigo-500 transition hover:shadow-md">
@@ -1188,10 +1193,15 @@
         if (s.tail_reached) tailCount++;
       });
 
+      const mc01IsOn = mc01 && ((mc01.current_status || "").toUpperCase() === "ON" || mc01Discharge > 0);
+      document.getElementById("kpiHeadMcDischarge").textContent = mc01Discharge.toFixed(2);
+      document.getElementById("kpiHeadMcStatus").textContent = mc01
+        ? `${mc01IsOn ? "● सुरू (ON)" : "● बंद (OFF)"} • मंजूर: ${mc01.design_discharge_cfs || 2800} Cusecs`
+        : "Main Canal Head (Cusecs)";
+
       document.getElementById("kpiTotalStructures").textContent = structures.length;
       document.getElementById("kpiActiveStructures").textContent = activeCount;
-      document.getElementById("kpiTotalDischarge").innerHTML =
-        `${totalDischarge.toFixed(2)} <span class="block text-[11px] font-bold text-sky-700 mt-1">MC-01 धरणातून विसर्ग: ${mc01Discharge.toFixed(2)} Cusecs</span>`;
+      document.getElementById("kpiTotalDischarge").textContent = totalDischarge.toFixed(2);
       document.getElementById("kpiTailReached").textContent = tailCount;
 
       // Filter + Sort:
