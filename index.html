@@ -191,8 +191,13 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button onclick="refreshAllAppData()" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btnAutoRefreshToggle" onclick="toggleAutoRefresh()" title="दर ३० सेकंदांनी ऑटो-रिफ्रेश चालू/बंद करा"
+            class="bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-emerald-400/40 transition flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+            <span id="autoRefreshLabel">Auto: ON (30s)</span>
+          </button>
+          <button onclick="refreshAllAppData(true)" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
             ↻ Refresh
           </button>
           <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition">
@@ -810,10 +815,55 @@
       loadPublicOrgData();
     }
 
-    // Generic Supabase REST Fetch Helper
-    async function sbFetch(path, options = {}) {
+    // Silently renew Supabase JWT access_token using refresh_token so user stays logged in permanently
+    let refreshTokenPromise = null;
+    async function ensureValidAccessToken(forceRefresh = false) {
       const session = getSession();
-      const token = session?.access_token || getSbKey();
+      if (!session || !session.access_token) return getSbKey();
+
+      const now = Date.now();
+      const isExpiringSoon = session.expires_at && (now > (session.expires_at - 120000));
+      if (!forceRefresh && !isExpiringSoon) {
+        return session.access_token;
+      }
+
+      if (!session.refresh_token) return session.access_token;
+
+      if (!refreshTokenPromise) {
+        refreshTokenPromise = (async () => {
+          try {
+            const resp = await fetch(`${getSbUrl()}/auth/v1/token?grant_type=refresh_token`, {
+              method: "POST",
+              headers: {
+                "apikey": getSbKey(),
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({ refresh_token: session.refresh_token })
+            });
+            const data = await resp.json();
+            if (resp.ok && data?.access_token) {
+              const updated = {
+                ...session,
+                access_token: data.access_token,
+                refresh_token: data.refresh_token || session.refresh_token,
+                expires_at: Date.now() + (Number(data.expires_in || 3600) * 1000)
+              };
+              saveSession(updated);
+              return updated.access_token;
+            }
+          } catch (_) {
+          } finally {
+            refreshTokenPromise = null;
+          }
+          return session.access_token;
+        })();
+      }
+      return await refreshTokenPromise;
+    }
+
+    // Generic Supabase REST Fetch Helper (with automatic silent token renewal on 401)
+    async function sbFetch(path, options = {}, retried = false) {
+      const token = await ensureValidAccessToken(false);
       const headers = {
         "apikey": getSbKey(),
         "Authorization": `Bearer ${token}`,
@@ -823,6 +873,10 @@
         ...options,
         headers
       });
+      if (resp.status === 401 && !retried && getSession()?.refresh_token) {
+        await ensureValidAccessToken(true);
+        return sbFetch(path, options, true);
+      }
       const text = await resp.text();
       let data = null;
       try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -886,6 +940,9 @@
         }
 
         const token = authData.access_token;
+        const refreshToken = authData.refresh_token || null;
+        const expiresIn = Number(authData.expires_in || 3600);
+        const expiresAt = Date.now() + (expiresIn * 1000);
         const uid = authData.user.id;
 
         // Fetch profile
@@ -908,6 +965,8 @@
 
         const sessionObj = {
           access_token: token,
+          refresh_token: refreshToken,
+          expires_at: expiresAt,
           user_id: uid,
           full_name: profile.full_name || identifier,
           username: profile.username || identifier,
@@ -931,6 +990,7 @@
     }
 
     function handleLogout() {
+      stopAutoRefreshTimer();
       clearSession();
       document.getElementById("loginPassword").value = "";
       document.getElementById("appSection").classList.add("hidden");
@@ -1195,8 +1255,15 @@
       elUsers.style.display = canUsers ? "" : "none";
 
       switchAppTab("dashboard");
-      await refreshAllAppData();
+      await refreshAllAppData(false);
+      startAutoRefreshTimer();
     }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && getSession()) {
+        refreshAllAppData(false);
+      }
+    });
 
     function switchAppTab(tabName) {
       document.querySelectorAll(".app-view").forEach(v => v.classList.add("hidden"));
@@ -1217,7 +1284,45 @@
       });
     }
 
-    async function refreshAllAppData() {
+    let autoRefreshEnabled = true;
+    let autoRefreshTimerId = null;
+
+    function startAutoRefreshTimer() {
+      stopAutoRefreshTimer();
+      if (!autoRefreshEnabled) return;
+      autoRefreshTimerId = setInterval(() => {
+        if (document.hidden || !getSession()) return;
+        // जर युजर सध्या फॉर्ममध्ये माहिती टाईप करत असेल तर त्यात व्यत्यय नको
+        const activeTag = document.activeElement?.tagName;
+        if (activeTag === "INPUT" || activeTag === "SELECT" || activeTag === "TEXTAREA") return;
+        refreshAllAppData(false);
+      }, 30000);
+    }
+
+    function stopAutoRefreshTimer() {
+      if (autoRefreshTimerId) {
+        clearInterval(autoRefreshTimerId);
+        autoRefreshTimerId = null;
+      }
+    }
+
+    function toggleAutoRefresh() {
+      autoRefreshEnabled = !autoRefreshEnabled;
+      const btn = document.getElementById("btnAutoRefreshToggle");
+      const lbl = document.getElementById("autoRefreshLabel");
+      if (autoRefreshEnabled) {
+        btn.className = "bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-emerald-400/40 transition flex items-center gap-1.5";
+        lbl.textContent = "Auto: ON (30s)";
+        startAutoRefreshTimer();
+        refreshAllAppData(true);
+      } else {
+        btn.className = "bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-500/40 transition flex items-center gap-1.5";
+        lbl.textContent = "Auto: OFF";
+        stopAutoRefreshTimer();
+      }
+    }
+
+    async function refreshAllAppData(isManual = false) {
       try {
         await loadPublicOrgData();
         const [structures, opStates, mappings, events] = await Promise.all([
@@ -1227,7 +1332,7 @@
           sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks,recorded_by,season,rotation_no&order=event_time.desc&limit=1000").catch(() => [])
         ]);
 
-        // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून D-28 आणि इतर सर्व आकडे Android App प्रमाणेच 100% जुळतील
+        // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून सर्व आकडे Android App प्रमाणेच 100% जुळतील
         const stateMap = new Map((opStates || []).map(st => [st.structure_id, st]));
         orgData.structures = (structures || []).map(s => {
           const op = stateMap.get(s.id);
@@ -1251,12 +1356,25 @@
         orgData.structureMappings = mappings || [];
         orgData.operationEvents = events || [];
 
+        // जर युजर सध्या Operation फॉर्मवर नसेल तरच ड्रॉपडाऊन रिसेट करा
+        const opViewHidden = document.getElementById("view-operation")?.classList.contains("hidden");
         renderDashboardTables();
-        populateOperationStructures();
-        populateMappingScreen();
-        populateBeatMasterScreen();
+        if (!document.getElementById("view-report")?.classList.contains("hidden")) {
+          renderConsolidatedReport();
+        }
+        if (opViewHidden || isManual) {
+          populateOperationStructures();
+          populateMappingScreen();
+          populateBeatMasterScreen();
+        }
+        if (isManual) {
+          const tStr = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+          showToast(`डेटा अद्ययावत झाला (${tStr})`, "success");
+        }
       } catch (err) {
-        showToast("डेटा रिफ्रेश करताना त्रुटी: " + err.message, "error");
+        if (isManual) {
+          showToast("डेटा रिफ्रेश करताना त्रुटी: " + err.message, "error");
+        }
       }
     }
 
