@@ -200,13 +200,16 @@
           <button data-tab="operation" onclick="switchAppTab('operation')" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             💧 विसर्ग / कालवा संचालन नोंद
           </button>
-          <button data-tab="mapping" id="navTabMapping" onclick="switchAppTab('mapping')" style="display:none;" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+          <button data-tab="report" onclick="switchAppTab('report')" class="nav-tab-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+            📋 एकत्रित संचालन अहवाल
+          </button>
+          <button data-tab="mapping" id="navTabMapping" onclick="switchAppTab('mapping')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             🗺️ Structure → Section Officer Mapping
           </button>
-          <button data-tab="beats" id="navTabBeats" onclick="switchAppTab('beats')" style="display:none;" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+          <button data-tab="beats" id="navTabBeats" onclick="switchAppTab('beats')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             📍 Beat Master
           </button>
-          <button data-tab="users" id="navTabUsers" onclick="switchAppTab('users')" style="display:none;" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
+          <button data-tab="users" id="navTabUsers" onclick="switchAppTab('users')" class="nav-tab-btn hidden px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-sky-100 hover:bg-white/10">
             👤 + नवीन User तयार करा
           </button>
         </div>
@@ -318,6 +321,39 @@
         </div>
       </section>
 
+      <!-- ==================== TAB 3 (REPORT): CONSOLIDATED OPERATION REPORT ==================== -->
+      <section id="view-report" class="app-view hidden space-y-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 class="text-base sm:text-lg font-bold text-slate-800">एकत्रित संचालन अहवाल (Consolidated Canal Operation Report)</h2>
+              <p class="text-xs text-slate-500">सर्व सुरू (ON) आणि बंद (OFF) असलेल्या वितरिकांची सद्यस्थिती व विसर्ग अहवाल</p>
+            </div>
+            <button onclick="window.print()" class="bg-wrdNavy hover:bg-wrdBlue text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">
+              🖨️ अहवाल Print / PDF Save करा
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-600">
+                  <th class="py-3 px-4 font-bold">अ.क्र.</th>
+                  <th class="py-3 px-4 font-bold">Structure ID व नाव</th>
+                  <th class="py-3 px-4 font-bold">प्रकार</th>
+                  <th class="py-3 px-4 font-bold">स्थिती (Status)</th>
+                  <th class="py-3 px-4 font-bold">चालू विसर्ग (Cusecs)</th>
+                  <th class="py-3 px-4 font-bold">मंजूर विसर्ग</th>
+                  <th class="py-3 px-4 font-bold">Tail Reach</th>
+                </tr>
+              </thead>
+              <tbody id="consolidatedReportTableBody" class="divide-y divide-slate-200 text-xs sm:text-sm">
+                <tr><td colspan="7" class="py-6 text-center text-slate-400">अहवाल लोड होत आहे...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- ==================== TAB 2: CANAL OPERATION / DISCHARGE ENTRY ==================== -->
       <section id="view-operation" class="app-view hidden">
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -354,6 +390,12 @@
                   <input id="opDischarge" type="number" step="0.01" min="0" required placeholder="उदा. 12.50"
                     class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
                 </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1">संचालन तारीख व वेळ (Date & Time) *</label>
+                <input id="opEventDateTime" type="datetime-local" required
+                  class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1086,6 +1128,12 @@
     function switchAppTab(tabName) {
       document.querySelectorAll(".app-view").forEach(v => v.classList.add("hidden"));
       document.getElementById(`view-${tabName}`)?.classList.remove("hidden");
+      if (tabName === "report") {
+        renderConsolidatedReport();
+      }
+      if (tabName === "operation") {
+        setDefaultOperationDateTime();
+      }
 
       document.querySelectorAll(".nav-tab-btn").forEach(btn => {
         if (btn.dataset.tab === tabName) {
@@ -1106,7 +1154,7 @@
           sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks&order=event_time.desc&limit=50").catch(() => [])
         ]);
 
-        // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन (Merge) करा जेणेकरून Android App आणि Web दोन्हीकडे 100% समान डेटा दिसेल
+        // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून D-28 आणि इतर सर्व आकडे Android App प्रमाणेच 100% जुळतील
         const stateMap = new Map((opStates || []).map(st => [st.structure_id, st]));
         orgData.structures = (structures || []).map(s => {
           const op = stateMap.get(s.id);
@@ -1349,6 +1397,8 @@
       const tailReached = document.getElementById("opTailReached").value === "true";
       const rotationDays = document.getElementById("opRotationDays").value ? parseInt(document.getElementById("opRotationDays").value, 10) : null;
       const remarks = document.getElementById("opRemarks").value.trim();
+      const manualDt = document.getElementById("opEventDateTime")?.value;
+      const eventTimeIso = manualDt ? new Date(manualDt).toISOString() : new Date().toISOString();
       const statusAfter = (eventType === "CLOSE" || discharge <= 0) ? "OFF" : "ON";
       const btn = document.getElementById("btnSaveOperation");
 
@@ -1357,7 +1407,7 @@
       btn.textContent = "नोंद Save होत आहे...";
 
       try {
-        // 1. Insert event into canal_operation_events
+        // 1. Insert event into canal_operation_events (with manual event_time)
         await sbFetch("/rest/v1/canal_operation_events", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
@@ -1367,6 +1417,7 @@
             status_after_event: statusAfter,
             discharge_cfs: discharge,
             rotation_period_days: rotationDays,
+            event_time: eventTimeIso,
             remarks: remarks || null,
             recorded_by: session.user_id
           })
@@ -1383,7 +1434,7 @@
           })
         });
 
-        // 3. Sync distributary_operation_state as well so Android App & Web stay 100% synchronized
+        // 3. Sync distributary_operation_state as well so Web and Android App stay 100% in sync
         await sbFetch("/rest/v1/distributary_operation_state?on_conflict=structure_id", {
           method: "POST",
           headers: {
@@ -1570,7 +1621,46 @@
     }
 
     // 9. BOOTSTRAP ON PAGE LOAD
+    
+    function setDefaultOperationDateTime() {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      const dtInput = document.getElementById("opEventDateTime");
+      if (dtInput && !dtInput.value) {
+        dtInput.value = now.toISOString().slice(0, 16);
+      }
+    }
+
+    function renderConsolidatedReport() {
+      const tbody = document.getElementById("consolidatedReportTableBody");
+      if (!tbody) return;
+      const list = getAccessibleStructures();
+      
+      if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">माहिती उपलब्ध नाही.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map((st, idx) => {
+        const isOn = (st.current_status || "").toUpperCase() === "ON" || Number(st.current_discharge_cfs || 0) > 0;
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4 text-slate-500">${idx + 1}</td>
+            <td class="py-3 px-4 font-bold text-slate-800">${st.id} — ${st.name || ""}</td>
+            <td class="py-3 px-4 text-slate-600">${st.structure_type || "-"} ${st.length_km ? `(${st.length_km} km)` : ""}</td>
+            <td class="py-3 px-4">
+              ${isOn ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">सुरू (ON)</span>' : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm">बंद (OFF)</span>'}
+            </td>
+            <td class="py-3 px-4 font-bold text-wrdAccent">${Number(st.current_discharge_cfs || 0).toFixed(2)} Cusecs</td>
+            <td class="py-3 px-4 text-slate-600">${st.design_discharge_cfs || "-"} Cusecs</td>
+            <td class="py-3 px-4">${st.tail_reached ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">होय (Tail)</span>' : '<span class="text-xs text-slate-500">नाही</span>'}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
     window.addEventListener("DOMContentLoaded", async () => {
+      setDefaultOperationDateTime();
       document.getElementById("cfgUrl").value = getSbUrl();
       document.getElementById("cfgKey").value = getSbKey();
       mountUserCreateForms();
