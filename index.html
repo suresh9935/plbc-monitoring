@@ -286,11 +286,14 @@
                   <th class="py-3 px-4 font-bold">प्रकार / साखळी</th>
                   <th class="py-3 px-4 font-bold">मंजूर / चालू विसर्ग</th>
                   <th class="py-3 px-4 font-bold">स्थिती</th>
+                  <th class="py-3 px-4 font-bold">पाळी (Rotation)</th>
+                  <th class="py-3 px-4 font-bold">सुरू तारीख / वेळ</th>
+                  <th class="py-3 px-4 font-bold">कोणी अपडेट केले</th>
                   <th class="py-3 px-4 font-bold">Tail Reach</th>
                 </tr>
               </thead>
               <tbody id="structuresTableBody" class="divide-y divide-slate-200/70 text-xs sm:text-sm">
-                <tr><td colspan="5" class="py-6 text-center text-slate-400">डेटा लोड होत आहे...</td></tr>
+                <tr><td colspan="8" class="py-6 text-center text-slate-400">डेटा लोड होत आहे...</td></tr>
               </tbody>
             </table>
           </div>
@@ -309,12 +312,13 @@
                   <th class="py-3 px-4 font-bold">वेळ (Event Time)</th>
                   <th class="py-3 px-4 font-bold">Structure</th>
                   <th class="py-3 px-4 font-bold">प्रकार (Event)</th>
-                  <th class="py-3 px-4 font-bold">विसर्ग (Cusecs)</th>
+                  <th class="py-3 px-4 font-bold">विसर्ग / पाळी</th>
+                  <th class="py-3 px-4 font-bold">कोणी नोंदवले</th>
                   <th class="py-3 px-4 font-bold">शेरा (Remarks)</th>
                 </tr>
               </thead>
               <tbody id="eventsTableBody" class="divide-y divide-slate-100 text-xs sm:text-sm">
-                <tr><td colspan="5" class="py-6 text-center text-slate-400">नोंदी लोड होत आहेत...</td></tr>
+                <tr><td colspan="6" class="py-6 text-center text-slate-400">नोंदी लोड होत आहेत...</td></tr>
               </tbody>
             </table>
           </div>
@@ -341,13 +345,15 @@
                   <th class="py-3 px-4 font-bold">Structure ID व नाव</th>
                   <th class="py-3 px-4 font-bold">प्रकार</th>
                   <th class="py-3 px-4 font-bold">स्थिती (Status)</th>
-                  <th class="py-3 px-4 font-bold">चालू विसर्ग (Cusecs)</th>
-                  <th class="py-3 px-4 font-bold">मंजूर विसर्ग</th>
+                  <th class="py-3 px-4 font-bold">चालू / मंजूर विसर्ग</th>
+                  <th class="py-3 px-4 font-bold">पाळी (Rotation)</th>
+                  <th class="py-3 px-4 font-bold">सुरू तारीख / वेळ</th>
+                  <th class="py-3 px-4 font-bold">कोणी अपडेट केले</th>
                   <th class="py-3 px-4 font-bold">Tail Reach</th>
                 </tr>
               </thead>
               <tbody id="consolidatedReportTableBody" class="divide-y divide-slate-200 text-xs sm:text-sm">
-                <tr><td colspan="7" class="py-6 text-center text-slate-400">अहवाल लोड होत आहे...</td></tr>
+                <tr><td colspan="9" class="py-6 text-center text-slate-400">अहवाल लोड होत आहे...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1149,9 +1155,9 @@
         await loadPublicOrgData();
         const [structures, opStates, mappings, events] = await Promise.all([
           sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
-          sbFetch("/rest/v1/distributary_operation_state?select=structure_id,status,current_discharge_cfs,tail_reached").catch(() => []),
+          sbFetch("/rest/v1/distributary_operation_state?select=*").catch(() => []),
           sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
-          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks&order=event_time.desc&limit=50").catch(() => [])
+          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks,recorded_by&order=event_time.desc&limit=200").catch(() => [])
         ]);
 
         // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून D-28 आणि इतर सर्व आकडे Android App प्रमाणेच 100% जुळतील
@@ -1168,7 +1174,10 @@
             ...s,
             current_status: isLiveOn ? "ON" : "OFF",
             current_discharge_cfs: liveFlow,
-            tail_reached: Boolean(s.tail_reached || op.tail_reached)
+            tail_reached: Boolean(s.tail_reached || op.tail_reached),
+            op_started_at: op.started_at || op.start_time || op.updated_at || null,
+            op_rotation_days: op.rotation_period_days ?? op.rotation_days ?? null,
+            op_updated_by: op.updated_by || op.started_by || op.recorded_by || null
           };
         });
 
@@ -1303,13 +1312,17 @@
           return (a.id || "").localeCompare(b.id || "", undefined, { numeric: true });
         });
 
+      const metaMap = buildStructureOperationMetaMap();
+      const profMap = new Map(orgData.profiles.map(p => [p.id, p.full_name || p.username]));
+
       const tbody = document.getElementById("structuresTableBody");
       if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">कोणतेही Structure आढळले नाही.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-slate-400">कोणतेही Structure आढळले नाही.</td></tr>`;
       } else {
         tbody.innerHTML = filtered.map(s => {
           const isHead = isHeadMC(s);
           const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+          const meta = metaMap.get(s.id) || { rotationText: "-", startDateText: "-", updatedByText: "-" };
           const rowClass = isHead
             ? "bg-sky-100/90 hover:bg-sky-200/70 border-l-4 border-l-sky-700 transition"
             : (isOn
@@ -1328,6 +1341,9 @@
                   ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">सुरू (ON)</span>`
                   : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm">बंद (OFF)</span>`}
               </td>
+              <td class="py-3 px-4 font-semibold text-slate-800 whitespace-nowrap">${meta.rotationText}</td>
+              <td class="py-3 px-4 text-xs text-slate-700 whitespace-nowrap">${meta.startDateText}</td>
+              <td class="py-3 px-4 text-xs font-semibold text-wrdNavy">${meta.updatedByText}</td>
               <td class="py-3 px-4">
                 ${s.tail_reached
                   ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">होय (Tail)</span>`
@@ -1342,16 +1358,19 @@
       const evBody = document.getElementById("eventsTableBody");
       const structMap = new Map(orgData.structures.map(s => [s.id, s.name]));
       if (orgData.operationEvents.length === 0) {
-        evBody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-slate-400">अद्याप कोणतीही संचालन नोंद नाही.</td></tr>`;
+        evBody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">अद्याप कोणतीही संचालन नोंद नाही.</td></tr>`;
       } else {
-        evBody.innerHTML = orgData.operationEvents.map(ev => {
-          const dt = ev.event_time ? new Date(ev.event_time).toLocaleString("en-IN") : "-";
+        evBody.innerHTML = orgData.operationEvents.slice(0, 50).map(ev => {
+          const dt = ev.event_time ? new Date(ev.event_time).toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+          const officerName = ev.recorded_by ? (profMap.get(ev.recorded_by) || "अधिकारी") : "-";
+          const rotLabel = (ev.rotation_period_days != null && ev.rotation_period_days !== "") ? ` • ${ev.rotation_period_days} दिवस` : "";
           return `
             <tr class="hover:bg-slate-50">
               <td class="py-2.5 px-4 text-xs text-slate-500 whitespace-nowrap">${dt}</td>
               <td class="py-2.5 px-4 font-semibold text-slate-800">${ev.structure_id} ${structMap.get(ev.structure_id) ? `— ${structMap.get(ev.structure_id)}` : ""}</td>
               <td class="py-2.5 px-4"><span class="bg-sky-100 text-wrdNavy text-xs font-bold px-2 py-0.5 rounded">${ev.event_type || "-"}</span></td>
-              <td class="py-2.5 px-4 font-bold text-wrdAccent">${Number(ev.discharge_cfs || 0).toFixed(2)}</td>
+              <td class="py-2.5 px-4 font-bold text-wrdAccent whitespace-nowrap">${Number(ev.discharge_cfs || 0).toFixed(2)} Cusecs<span class="text-slate-500 font-normal text-xs">${rotLabel}</span></td>
+              <td class="py-2.5 px-4 text-xs font-semibold text-wrdNavy">${officerName}</td>
               <td class="py-2.5 px-4 text-slate-600">${ev.remarks || "-"}</td>
             </tr>
           `;
@@ -1631,18 +1650,73 @@
       }
     }
 
+    function buildStructureOperationMetaMap() {
+      const profMap = new Map(orgData.profiles.map(p => [p.id, p.full_name || p.username]));
+      const latestEvMap = new Map();
+      const latestOpenEvMap = new Map();
+
+      orgData.operationEvents.forEach(ev => {
+        if (!latestEvMap.has(ev.structure_id)) {
+          latestEvMap.set(ev.structure_id, ev);
+        }
+        const evType = (ev.event_type || "").toUpperCase();
+        const afterSt = (ev.status_after_event || "").toUpperCase();
+        if ((evType === "OPEN" || evType === "START" || afterSt === "ON" || afterSt === "RUNNING") && !latestOpenEvMap.has(ev.structure_id)) {
+          latestOpenEvMap.set(ev.structure_id, ev);
+        }
+      });
+
+      const formatDt = (raw) => {
+        if (!raw) return "-";
+        const d = new Date(raw);
+        if (isNaN(d.getTime())) return String(raw);
+        return d.toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      };
+
+      const result = new Map();
+      orgData.structures.forEach(s => {
+        const isOn = (s.current_status || "").toUpperCase() === "ON" || Number(s.current_discharge_cfs || 0) > 0;
+        const lastEv = latestEvMap.get(s.id);
+        const openEv = latestOpenEvMap.get(s.id);
+
+        const rotVal = s.op_rotation_days ?? lastEv?.rotation_period_days ?? openEv?.rotation_period_days ?? null;
+        const rotationText = (rotVal !== null && rotVal !== undefined && rotVal !== "") ? `${rotVal} दिवस` : "-";
+
+        const rawDate = isOn
+          ? (openEv?.event_time || s.op_started_at || lastEv?.event_time || null)
+          : (lastEv?.event_time || s.op_started_at || null);
+        const startDateText = formatDt(rawDate);
+
+        const officerId = lastEv?.recorded_by || openEv?.recorded_by || s.op_updated_by || null;
+        const updatedByText = officerId ? (profMap.get(officerId) || "अधिकारी") : "-";
+
+        result.set(s.id, { rotationText, startDateText, updatedByText });
+      });
+      return result;
+    }
+
     function renderConsolidatedReport() {
       const tbody = document.getElementById("consolidatedReportTableBody");
       if (!tbody) return;
-      const list = getAccessibleStructures();
+      const list = getAccessibleStructures().slice().sort((a, b) => {
+        const aHead = (a.id || "").trim().toUpperCase() === "MC-01" ? 1 : 0;
+        const bHead = (b.id || "").trim().toUpperCase() === "MC-01" ? 1 : 0;
+        if (bHead !== aHead) return bHead - aHead;
+        const aOn = ((a.current_status || "").toUpperCase() === "ON" || Number(a.current_discharge_cfs) > 0) ? 1 : 0;
+        const bOn = ((b.current_status || "").toUpperCase() === "ON" || Number(b.current_discharge_cfs) > 0) ? 1 : 0;
+        if (bOn !== aOn) return bOn - aOn;
+        return (a.id || "").localeCompare(b.id || "", undefined, { numeric: true });
+      });
+      const metaMap = buildStructureOperationMetaMap();
       
       if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-400">माहिती उपलब्ध नाही.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" class="py-6 text-center text-slate-400">माहिती उपलब्ध नाही.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = list.map((st, idx) => {
         const isOn = (st.current_status || "").toUpperCase() === "ON" || Number(st.current_discharge_cfs || 0) > 0;
+        const meta = metaMap.get(st.id) || { rotationText: "-", startDateText: "-", updatedByText: "-" };
         return `
           <tr class="hover:bg-slate-50">
             <td class="py-3 px-4 text-slate-500">${idx + 1}</td>
@@ -1651,8 +1725,10 @@
             <td class="py-3 px-4">
               ${isOn ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-sm">सुरू (ON)</span>' : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-600 text-white shadow-sm">बंद (OFF)</span>'}
             </td>
-            <td class="py-3 px-4 font-bold text-wrdAccent">${Number(st.current_discharge_cfs || 0).toFixed(2)} Cusecs</td>
-            <td class="py-3 px-4 text-slate-600">${st.design_discharge_cfs || "-"} Cusecs</td>
+            <td class="py-3 px-4 font-bold text-wrdAccent">${Number(st.current_discharge_cfs || 0).toFixed(2)} / <span class="text-slate-500 font-normal">${st.design_discharge_cfs || "-"} Cusecs</span></td>
+            <td class="py-3 px-4 font-semibold text-slate-800 whitespace-nowrap">${meta.rotationText}</td>
+            <td class="py-3 px-4 text-xs text-slate-700 whitespace-nowrap">${meta.startDateText}</td>
+            <td class="py-3 px-4 text-xs font-semibold text-wrdNavy">${meta.updatedByText}</td>
             <td class="py-3 px-4">${st.tail_reached ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800">होय (Tail)</span>' : '<span class="text-xs text-slate-500">नाही</span>'}</td>
           </tr>
         `;
