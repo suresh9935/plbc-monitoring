@@ -231,6 +231,34 @@
 
       <!-- ==================== TAB 1: DASHBOARD ==================== -->
       <section id="view-dashboard" class="app-view space-y-6">
+        <!-- हंगाम (Season) व आवर्तन क्रमांक (Rotation No.) निवड पट्टी -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-bold text-wrdNavy uppercase tracking-wide">सक्रिय सिंचन हंगाम व आवर्तन फिल्टर</p>
+            <p class="text-[11px] text-slate-500">निवडलेल्या हंगाम आणि आवर्तनानुसारच एकूण पाणी वापर (MCM/TMC) व नोंदी दिसतील</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="globalSeasonFilter" onchange="onGlobalSeasonRotationChange()"
+              class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm font-bold text-wrdNavy bg-sky-50/50 focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+              <option value="रब्बी 2026-27" selected>हंगाम: रब्बी 2026-27</option>
+              <option value="उन्हाळी 2027">हंगाम: उन्हाळी 2027</option>
+              <option value="खरीप 2027">हंगाम: खरीप 2027</option>
+              <option value="रब्बी 2027-28">हंगाम: रब्बी 2027-28</option>
+              <option value="उन्हाळी 2028">हंगाम: उन्हाळी 2028</option>
+              <option value="ALL">सर्व हंगाम (All Seasons)</option>
+            </select>
+            <select id="globalRotationFilter" onchange="onGlobalSeasonRotationChange()"
+              class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm font-bold text-wrdNavy bg-sky-50/50 focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+              <option value="1" selected>आवर्तन क्र. 1</option>
+              <option value="2">आवर्तन क्र. 2</option>
+              <option value="3">आवर्तन क्र. 3</option>
+              <option value="4">आवर्तन क्र. 4</option>
+              <option value="5">आवर्तन क्र. 5</option>
+              <option value="ALL">सर्व आवर्तने (All Rotations)</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Clickable KPI Summary Cards (धरणातून विसर्ग स्वतंत्र + वितरिका विसर्ग स्वतंत्र) -->
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           <div class="bg-gradient-to-br from-sky-50 to-blue-100/70 rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-sky-600 transition hover:shadow-md">
@@ -385,6 +413,31 @@
             </div>
 
             <form id="operationForm" onsubmit="submitCanalOperation(event)" class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-sky-50/70 p-3.5 rounded-xl border border-sky-200">
+                <div>
+                  <label class="block text-xs font-bold text-wrdNavy mb-1">सिंचन हंगाम (Season) *</label>
+                  <select id="opSeason" required onchange="syncOpSeasonToGlobal()"
+                    class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                    <option value="रब्बी 2026-27" selected>रब्बी 2026-27</option>
+                    <option value="उन्हाळी 2027">उन्हाळी 2027</option>
+                    <option value="खरीप 2027">खरीप 2027</option>
+                    <option value="रब्बी 2027-28">रब्बी 2027-28</option>
+                    <option value="उन्हाळी 2028">उन्हाळी 2028</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-wrdNavy mb-1">आवर्तन क्रमांक (Rotation No.) *</label>
+                  <select id="opRotationNo" required onchange="syncOpSeasonToGlobal()"
+                    class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                    <option value="1" selected>आवर्तन क्र. 1</option>
+                    <option value="2">आवर्तन क्र. 2</option>
+                    <option value="3">आवर्तन क्र. 3</option>
+                    <option value="4">आवर्तन क्र. 4</option>
+                    <option value="5">आवर्तन क्र. 5</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1">Structure निवडा *</label>
                 <select id="opStructureSelect" required onchange="onOpStructureChange()"
@@ -1171,7 +1224,7 @@
           sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
           sbFetch("/rest/v1/distributary_operation_state?select=*").catch(() => []),
           sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
-          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks,recorded_by&order=event_time.desc&limit=1000").catch(() => [])
+          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks,recorded_by,season,rotation_no&order=event_time.desc&limit=1000").catch(() => [])
         ]);
 
         // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून D-28 आणि इतर सर्व आकडे Android App प्रमाणेच 100% जुळतील
@@ -1374,19 +1427,21 @@
         }).join("");
       }
 
-      // Events table
+      // Events table (filtered by active Season & Rotation No.)
       const evBody = document.getElementById("eventsTableBody");
       const structMap = new Map(orgData.structures.map(s => [s.id, s.name]));
-      if (orgData.operationEvents.length === 0) {
-        evBody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">अद्याप कोणतीही संचालन नोंद नाही.</td></tr>`;
+      const filteredEvList = getFilteredSeasonRotationEvents();
+      if (filteredEvList.length === 0) {
+        evBody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">निवडलेल्या हंगाम व आवर्तनामध्ये अद्याप संचालन नोंद नाही.</td></tr>`;
       } else {
-        evBody.innerHTML = orgData.operationEvents.slice(0, 50).map(ev => {
+        evBody.innerHTML = filteredEvList.slice(0, 50).map(ev => {
           const dt = ev.event_time ? new Date(ev.event_time).toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
           const officerName = ev.recorded_by ? (profMap.get(ev.recorded_by) || "अधिकारी") : "-";
           const rotLabel = (ev.rotation_period_days != null && ev.rotation_period_days !== "") ? ` • ${ev.rotation_period_days} दिवस` : "";
+          const seasonTag = `${ev.season || "रब्बी 2026-27"} (आवर्तन ${ev.rotation_no ?? 1})`;
           return `
             <tr class="hover:bg-slate-50">
-              <td class="py-2.5 px-4 text-xs text-slate-500 whitespace-nowrap">${dt}</td>
+              <td class="py-2.5 px-4 text-xs text-slate-500 whitespace-nowrap">${dt}<div class="text-[10px] font-semibold text-wrdBlue">${seasonTag}</div></td>
               <td class="py-2.5 px-4 font-semibold text-slate-800">${ev.structure_id} ${structMap.get(ev.structure_id) ? `— ${structMap.get(ev.structure_id)}` : ""}</td>
               <td class="py-2.5 px-4"><span class="bg-sky-100 text-wrdNavy text-xs font-bold px-2 py-0.5 rounded">${ev.event_type || "-"}</span></td>
               <td class="py-2.5 px-4 font-bold text-wrdAccent whitespace-nowrap">${Number(ev.discharge_cfs || 0).toFixed(2)} Cusecs<span class="text-slate-500 font-normal text-xs">${rotLabel}</span></td>
@@ -1452,6 +1507,8 @@
           headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
           body: JSON.stringify({
             structure_id: structureId,
+            season: document.getElementById("opSeason")?.value || "रब्बी 2026-27",
+            rotation_no: parseInt(document.getElementById("opRotationNo")?.value || "1", 10),
             event_type: eventType,
             status_after_event: statusAfter,
             discharge_cfs: discharge,
@@ -1491,7 +1548,10 @@
         // Generate Digital Receipt
         const structObj = orgData.structures.find(s => s.id === structureId);
         const nowStr = new Date().toLocaleString("en-IN");
+        const selectedSeason = document.getElementById("opSeason")?.value || "रब्बी 2026-27";
+        const selectedRotNo = document.getElementById("opRotationNo")?.value || "1";
         document.getElementById("receiptBody").innerHTML = `
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">हंगाम व आवर्तन:</span><span class="font-bold text-wrdBlue">${selectedSeason} • आवर्तन क्र. ${selectedRotNo}</span></div>
           <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">दिनांक व वेळ:</span><span class="font-bold">${nowStr}</span></div>
           <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">Structure:</span><span class="font-bold text-wrdNavy">${structureId} — ${structObj?.name || ""}</span></div>
           <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">संचालन प्रकार:</span><span class="font-bold">${eventType} (${statusAfter})</span></div>
@@ -1676,11 +1736,43 @@
       setTimeout(() => document.body.classList.remove("print-report"), 500);
     }
 
+    function getFilteredSeasonRotationEvents() {
+      const selSeason = document.getElementById("globalSeasonFilter")?.value || "रब्बी 2026-27";
+      const selRot = document.getElementById("globalRotationFilter")?.value || "1";
+      return orgData.operationEvents.filter(ev => {
+        const evSeason = (ev.season || "रब्बी 2026-27").trim();
+        const evRot = String(ev.rotation_no ?? 1);
+        const matchSeason = selSeason === "ALL" || evSeason === selSeason;
+        const matchRot = selRot === "ALL" || evRot === selRot;
+        return matchSeason && matchRot;
+      });
+    }
+
+    function onGlobalSeasonRotationChange() {
+      const selSeason = document.getElementById("globalSeasonFilter")?.value;
+      const selRot = document.getElementById("globalRotationFilter")?.value;
+      if (selSeason && selSeason !== "ALL" && document.getElementById("opSeason")) {
+        document.getElementById("opSeason").value = selSeason;
+      }
+      if (selRot && selRot !== "ALL" && document.getElementById("opRotationNo")) {
+        document.getElementById("opRotationNo").value = selRot;
+      }
+      renderDashboardTables();
+      renderConsolidatedReport();
+    }
+
+    function syncOpSeasonToGlobal() {
+      const s = document.getElementById("opSeason")?.value;
+      const r = document.getElementById("opRotationNo")?.value;
+      if (s && document.getElementById("globalSeasonFilter")) document.getElementById("globalSeasonFilter").value = s;
+      if (r && document.getElementById("globalRotationFilter")) document.getElementById("globalRotationFilter").value = r;
+    }
+
     function buildStructureOperationMetaMap() {
       const profMap = new Map(orgData.profiles.map(p => [p.id, p.full_name || p.username]));
       const eventsByStruct = new Map();
 
-      const sortedEvents = orgData.operationEvents.slice().sort((a, b) => {
+      const sortedEvents = getFilteredSeasonRotationEvents().slice().sort((a, b) => {
         const ta = a.event_time ? new Date(a.event_time).getTime() : 0;
         const tb = b.event_time ? new Date(b.event_time).getTime() : 0;
         return ta - tb;
@@ -1824,7 +1916,9 @@
 
       const nowStr = new Date().toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
       const metaEl = document.getElementById("reportGeneratedMeta");
-      if (metaEl) metaEl.textContent = `अहवाल वेळ: ${nowStr} • सर्व वितरिकांचा चालू विसर्ग, शिल्लक दिवस, विसर्ग बदल नोंदी व एकूण पाणी वापर`;
+      const sLbl = document.getElementById("globalSeasonFilter")?.value || "रब्बी 2026-27";
+      const rLbl = document.getElementById("globalRotationFilter")?.value || "1";
+      if (metaEl) metaEl.textContent = `हंगाम: ${sLbl} • आवर्तन क्र.: ${rLbl} • अहवाल वेळ: ${nowStr}`;
 
       let onCount = 0;
       let distFlowTotal = 0;
