@@ -1800,22 +1800,12 @@
         const evList = eventsByStruct.get(s.id) || [];
         const lastEv = evList.length > 0 ? evList[evList.length - 1] : null;
 
-        let cycleStartIdx = 0;
-        for (let i = evList.length - 1; i >= 0; i--) {
-          const t = (evList[i].event_type || "").toUpperCase();
-          const stAfter = (evList[i].status_after_event || "").toUpperCase();
-          if (t === "CLOSE" || t === "STOP" || stAfter === "OFF" || stAfter === "CLOSED") {
-            if (!isOn && i > 0) continue;
-            cycleStartIdx = i + 1;
-            break;
-          }
-        }
-        const cycleEvents = evList.slice(cycleStartIdx);
-        const firstOpenEv = cycleEvents.find(e => {
+        // संपूर्ण निवडलेल्या हंगाम व आवर्तनातील सर्व टप्प्यांची अचूक बेरीज (बंद-चालू टप्प्यांसह)
+        const firstOpenEv = evList.find(e => {
           const t = (e.event_type || "").toUpperCase();
           const st = (e.status_after_event || "").toUpperCase();
           return t === "OPEN" || t === "START" || st === "ON" || st === "RUNNING";
-        }) || cycleEvents[0] || lastEv;
+        }) || evList[0] || lastEv;
 
         let rotDays = s.op_rotation_days ?? null;
         for (let i = evList.length - 1; i >= 0; i--) {
@@ -1829,52 +1819,64 @@
         const startMs = startRaw ? new Date(startRaw).getTime() : NaN;
         const startDateText = formatDt(startRaw);
 
-        let rotationHtml = "-";
-        let remainingDaysText = "-";
-        if (rotDays && rotDays > 0) {
-          if (isOn && !isNaN(startMs)) {
-            const elapsedDays = Math.max(0, (nowMs - startMs) / (1000 * 60 * 60 * 24));
-            const remDays = Math.max(0, rotDays - elapsedDays);
-            const remColor = remDays <= 1 ? "text-rose-700 font-bold" : "text-emerald-800 font-bold";
-            remainingDaysText = `${remDays.toFixed(1)} दिवस शिल्लक`;
-            rotationHtml = `<div class="font-bold text-slate-800">एकूण: ${rotDays} दिवस</div><div class="text-[11px] ${remColor}">शिल्लक: ${remDays.toFixed(1)} दिवस</div>`;
-          } else {
-            remainingDaysText = isOn ? `${rotDays} दिवस` : "बंद (0 दिवस)";
-            rotationHtml = `<div class="font-bold text-slate-800">एकूण: ${rotDays} दिवस</div><div class="text-[11px] text-slate-500">${isOn ? "" : "संचालन बंद"}</div>`;
-          }
-        }
-
         let totalMcm = 0;
+        let totalActiveSec = 0;
         const stepLogs = [];
-        for (let i = 0; i < cycleEvents.length; i++) {
-          const cur = cycleEvents[i];
-          const q = Number(cur.discharge_cfs || 0);
+
+        for (let i = 0; i < evList.length; i++) {
+          const cur = evList[i];
+          const evType = (cur.event_type || "").toUpperCase();
+          const stAfter = (cur.status_after_event || "").toUpperCase();
+          const isClosedSeg = evType === "CLOSE" || evType === "STOP" || stAfter === "OFF" || stAfter === "CLOSED";
+          const q = isClosedSeg ? 0 : Number(cur.discharge_cfs || 0);
+
           const t1 = cur.event_time ? new Date(cur.event_time).getTime() : NaN;
           if (isNaN(t1)) continue;
 
-          const nextEv = cycleEvents[i + 1];
+          const nextEv = evList[i + 1];
           const t2 = nextEv && nextEv.event_time
             ? new Date(nextEv.event_time).getTime()
             : (isOn ? nowMs : t1);
 
           const dtSec = Math.max(0, (t2 - t1) / 1000);
-          const segMcm = q * dtSec * CUSEC_SEC_TO_MCM;
-          totalMcm += segMcm;
-
-          const hrs = (dtSec / 3600).toFixed(1);
-          stepLogs.push(`${formatDt(cur.event_time)} → ${q.toFixed(1)} Cusecs (${hrs} तास = ${segMcm.toFixed(4)} MCM)`);
+          if (q > 0) {
+            totalActiveSec += dtSec;
+            const segMcm = q * dtSec * CUSEC_SEC_TO_MCM;
+            totalMcm += segMcm;
+            const hrs = (dtSec / 3600).toFixed(1);
+            stepLogs.push(`${formatDt(cur.event_time)} → ${q.toFixed(1)} Cusecs (${hrs} तास = ${segMcm.toFixed(4)} MCM)`);
+          } else if (isClosedSeg) {
+            const hrs = (dtSec / 3600).toFixed(1);
+            stepLogs.push(`${formatDt(cur.event_time)} → बंद (CLOSE • ${hrs} तास बंद)`);
+          }
         }
 
-        if (cycleEvents.length === 0 && isOn && Number(s.current_discharge_cfs || 0) > 0 && !isNaN(startMs)) {
+        if (evList.length === 0 && isOn && Number(s.current_discharge_cfs || 0) > 0 && !isNaN(startMs)) {
           const dtSec = Math.max(0, (nowMs - startMs) / 1000);
+          totalActiveSec = dtSec;
           totalMcm = Number(s.current_discharge_cfs) * dtSec * CUSEC_SEC_TO_MCM;
           stepLogs.push(`${formatDt(startRaw)} → ${Number(s.current_discharge_cfs).toFixed(1)} Cusecs`);
         }
 
+        let rotationHtml = "-";
+        let remainingDaysText = "-";
+        if (rotDays && rotDays > 0) {
+          const activeDays = totalActiveSec / (60 * 60 * 24);
+          const remDays = Math.max(0, rotDays - activeDays);
+          const remColor = remDays <= 1 ? "text-rose-700 font-bold" : "text-emerald-800 font-bold";
+          if (isOn) {
+            remainingDaysText = `${remDays.toFixed(1)} दिवस शिल्लक`;
+            rotationHtml = `<div class="font-bold text-slate-800">एकूण: ${rotDays} दिवस</div><div class="text-[11px] ${remColor}">शिल्लक: ${remDays.toFixed(1)} दिवस (वापर: ${activeDays.toFixed(1)} दि.)</div>`;
+          } else {
+            remainingDaysText = evList.length > 0 ? `${remDays.toFixed(1)} दिवस शिल्लक (बंद)` : "बंद";
+            rotationHtml = `<div class="font-bold text-slate-800">एकूण: ${rotDays} दिवस</div><div class="text-[11px] text-slate-600">${evList.length > 0 ? `शिल्लक: ${remDays.toFixed(1)} दिवस (सध्या बंद)` : "संचालन बंद"}</div>`;
+          }
+        }
+
         const totalTmc = totalMcm * MCM_TO_TMC;
-        const hasVolume = totalMcm > 0 || cycleEvents.length > 0;
+        const hasVolume = totalMcm > 0 || evList.length > 0;
         const waterUsedHtml = hasVolume
-          ? `<div class="font-bold text-wrdNavy">${totalMcm.toFixed(4)} MCM</div><div class="text-[11px] text-slate-600">(${totalTmc.toFixed(4)} TMC • ${stepLogs.length} नोंदी)</div>`
+          ? `<div class="font-bold text-wrdNavy">${totalMcm.toFixed(4)} MCM</div><div class="text-[11px] text-slate-600">(${totalTmc.toFixed(4)} TMC • ${stepLogs.length} टप्पे)</div>`
           : "-";
 
         const officerId = lastEv?.recorded_by || firstOpenEv?.recorded_by || s.op_updated_by || null;
