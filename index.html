@@ -791,8 +791,8 @@
       if (!identifier || !password) return;
 
       const email = identifier.includes("@")
-        ? identifier.toLowerCase()
-        : `${identifier.toLowerCase()}@plbc-login.invalid`;
+  ? identifier.toLowerCase()
+  : `${identifier.toLowerCase()}@plbc-wrd.com`;
 
       btn.disabled = true;
       btn.textContent = "Login तपासत आहे...";
@@ -1058,7 +1058,7 @@
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              email: `${username}@plbc-login.invalid`,
+              email: `${username}@plbc-wrd.com`,
               password: password,
               data: {
                 full_name: payload.full_name,
