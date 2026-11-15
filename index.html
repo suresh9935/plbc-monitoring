@@ -135,6 +135,14 @@
             </button>
           </div>
 
+          <div class="bg-amber-50 text-amber-900 text-xs rounded-xl p-3 border border-amber-200 flex items-start gap-2">
+            <span>🔑</span>
+            <div>
+              <strong>पासवर्ड विसरलात (Forgot Password)?</strong><br/>
+              कृपया <strong>Admin</strong> यांच्याशी संपर्क साधा. Admin पासवर्ड रीसेट करून डिफॉल्ट पासवर्ड <code class="bg-amber-100 px-1.5 py-0.5 rounded font-bold text-wrdNavy">Plbc@2026#</code> करतील. त्यानंतर लॉगिन करून वरच्या मेनूमधील <strong>"🔑 पासवर्ड बदला"</strong> बटणावरून तुमचा नवीन पासवर्ड सेट करा.
+            </div>
+          </div>
+
           <div id="loginStatusBox" class="bg-slate-100 text-slate-700 text-xs rounded-xl p-3 border border-slate-200">
             नवीन खाते तयार करण्यासाठी वरील <strong>"+ नवीन User तयार करा"</strong> बटणावर क्लिक करा.
           </div>
@@ -199,6 +207,9 @@
           </button>
           <button onclick="refreshAllAppData(true)" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
             ↻ Refresh
+          </button>
+          <button onclick="openChangePasswordModal()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-xl shadow transition">
+            🔑 पासवर्ड बदला
           </button>
           <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow transition">
             Logout
@@ -656,8 +667,8 @@
         </div>
       </section>
 
-      <!-- ==================== TAB 5: ADMIN / SDO CREATE USER ==================== -->
-      <section id="view-users" class="app-view hidden">
+      <!-- ==================== TAB 5: ADMIN / SDO CREATE USER & ADMIN PASSWORD RESET ==================== -->
+      <section id="view-users" class="app-view hidden space-y-6">
         <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4">
           <div>
             <h2 class="text-lg font-bold text-wrdNavy">नवीन अधिकारी / कर्मचारी खाते तयार करा</h2>
@@ -665,9 +676,78 @@
           </div>
           <div id="adminUserFormContainer"></div>
         </div>
+
+        <!-- फक्त Admin / Superadmin साठी User Password Reset पॅनेल -->
+        <div id="adminPasswordResetCard" class="hidden max-w-xl mx-auto bg-white rounded-2xl shadow-sm border-2 border-amber-400 p-5 sm:p-6 space-y-4">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="inline-block bg-amber-100 text-amber-900 text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-1">फक्त Admin अधिकार</span>
+              <h2 class="text-lg font-bold text-wrdNavy">🔑 User Password Reset करा (Default: Plbc@2026#)</h2>
+              <p class="text-xs text-slate-500 mt-0.5">एखादा अधिकारी/कर्मचारी पासवर्ड विसरल्यास येथून त्याचा पासवर्ड डिफॉल्ट <strong class="text-wrdNavy">Plbc@2026#</strong> वर रीसेट करा.</p>
+            </div>
+          </div>
+
+          <form onsubmit="handleAdminResetUserPassword(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">अधिकारी / कर्मचारी निवडा *</label>
+              <select id="adminResetTargetUserSelect" required
+                class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <option value="">— User निवडा —</option>
+              </select>
+            </div>
+
+            <button type="submit" id="btnAdminResetPassSubmit"
+              class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-xl shadow transition">
+              🔄 Password रीसेट करून Plbc@2026# करा
+            </button>
+
+            <div id="adminResetPassStatusBox" class="bg-slate-100 text-slate-700 text-xs rounded-xl p-3 border border-slate-200">
+              निवडलेल्या युझरचा पासवर्ड रीसेट केल्यावर तो <strong>Plbc@2026#</strong> टाकून लॉगिन करू शकेल व नंतर स्वतःचा नवीन पासवर्ड बदलू शकेल.
+            </div>
+          </form>
+        </div>
       </section>
 
     </main>
+  </div>
+
+  <!-- ==================== CHANGE PASSWORD MODAL (ALL USERS) ==================== -->
+  <div id="changePasswordModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-wrdNavy">🔑 नवीन पासवर्ड सेट करा (Change Password)</h3>
+        <button type="button" onclick="closeChangePasswordModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg">✕</button>
+      </div>
+      <p class="text-xs text-slate-500">जर तुम्ही डिफॉल्ट पासवर्ड (<code>Plbc@2026#</code>) ने लॉगिन केले असेल, तर येथे तुमचा स्वतःचा नवीन मजबूत पासवर्ड सेट करा (किमान ८ अक्षरे).</p>
+      <form onsubmit="submitChangePassword(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">नवीन Password *</label>
+          <div class="relative">
+            <input id="newUserPassword" type="password" required minlength="8" placeholder="नवीन पासवर्ड टाका (किमान ८ अक्षरे)"
+              class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+            <button type="button" onclick="togglePassword('newUserPassword')" class="absolute right-3 top-2.5 text-xs font-medium text-slate-500 hover:text-slate-800">पहा</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">नवीन Password पुन्हा टाका (Confirm) *</label>
+          <div class="relative">
+            <input id="confirmUserPassword" type="password" required minlength="8" placeholder="पासवर्डची खात्री करा"
+              class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+            <button type="button" onclick="togglePassword('confirmUserPassword')" class="absolute right-3 top-2.5 text-xs font-medium text-slate-500 hover:text-slate-800">पहा</button>
+          </div>
+        </div>
+        <div id="changePasswordStatusBox" class="hidden text-xs rounded-xl p-2.5"></div>
+        <div class="flex gap-2 pt-2">
+          <button type="submit" id="btnSubmitNewPass" class="flex-1 bg-wrdAccent hover:bg-sky-700 text-white font-bold py-2.5 rounded-xl text-sm shadow transition">
+            पासवर्ड अपडेट करा
+          </button>
+          <button type="button" onclick="closeChangePasswordModal()"
+            class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-sm transition">
+            रद्द करा
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- ==================== GLOBAL FOOTER ==================== -->
@@ -743,9 +823,15 @@
       </div>
 
       <div>
-        <label class="block text-xs sm:text-sm font-semibold text-slate-700 mb-1">Initial Password (किमान 8 characters) *</label>
-        <input name="password" type="password" required minlength="8" placeholder="किमान 8 अक्षरे व अंक"
-          class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-xs sm:text-sm font-semibold text-slate-700">Initial Password (Default: Plbc@2026#) *</label>
+          <button type="button" onclick="this.form.elements['password'].value='Plbc@2026#'; this.form.elements['password'].type='text';"
+            class="text-[11px] font-bold text-wrdAccent hover:underline">
+            Plbc@2026# वापरा
+          </button>
+        </div>
+        <input name="password" type="text" required minlength="8" value="Plbc@2026#" placeholder="किमान 8 अक्षरे व अंक"
+          class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-wrdNavy focus:outline-none focus:ring-2 focus:ring-wrdAccent" />
       </div>
 
       <button type="submit" name="submitBtn"
@@ -1055,6 +1141,14 @@
           const statusEl = form.querySelector(".create-user-status");
           statusEl.textContent = `तयार. (${orgData.divisions.length} Divisions, ${orgData.subdivisions.length} Subdivisions लोड)`;
         });
+
+        const resetSel = document.getElementById("adminResetTargetUserSelect");
+        if (resetSel) {
+          const prevVal = resetSel.value;
+          resetSel.innerHTML = `<option value="">— अधिकारी / कर्मचारी निवडा (${orgData.profiles.length}) —</option>` +
+            orgData.profiles.map(p => `<option value="${p.id}">${p.full_name || p.username} (${p.username || ""}) — ${(p.role || "").toUpperCase()}</option>`).join("");
+          if (prevVal) resetSel.value = prevVal;
+        }
       } catch (err) {
         console.error(err);
       }
@@ -1237,7 +1331,7 @@
         statusBox.innerHTML = `<span class="text-emerald-700 font-bold">यशस्वी! नवीन User ID: <code>${username}</code><br/>आता या User ID ने Login करा.</span>`;
         showToast(`नवीन User तयार झाला: ${username}`, "success");
         form.elements["fullName"].value = "";
-        form.elements["password"].value = "";
+        form.elements["password"].value = "Plbc@2026#";
         await loadPublicOrgData();
       } catch (err) {
         statusBox.innerHTML = `<span class="text-rose-600 font-semibold">Error: ${err.message}</span>`;
@@ -1277,6 +1371,14 @@
 
       elUsers.classList.toggle("hidden", !canUsers);
       elUsers.style.display = canUsers ? "" : "none";
+
+      // फक्त Admin / Superadmin लाच पासवर्ड रीसेट कार्ड दिसेल
+      const isPureAdmin = ["admin", "superadmin"].includes(role);
+      const resetCard = document.getElementById("adminPasswordResetCard");
+      if (resetCard) {
+        resetCard.classList.toggle("hidden", !isPureAdmin);
+        resetCard.style.display = isPureAdmin ? "" : "none";
+      }
 
       switchAppTab("dashboard");
       await refreshAllAppData(false);
@@ -2191,6 +2293,99 @@
           </tr>
         `;
       }).join("");
+    }
+
+    // ==================== CHANGE PASSWORD & ADMIN RESET PASSWORD ====================
+    function openChangePasswordModal() {
+      document.getElementById("newUserPassword").value = "";
+      document.getElementById("confirmUserPassword").value = "";
+      const box = document.getElementById("changePasswordStatusBox");
+      box.classList.add("hidden");
+      box.textContent = "";
+      document.getElementById("changePasswordModal").classList.remove("hidden");
+    }
+
+    function closeChangePasswordModal() {
+      document.getElementById("changePasswordModal").classList.add("hidden");
+    }
+
+    async function submitChangePassword(e) {
+      e.preventDefault();
+      const p1 = document.getElementById("newUserPassword").value;
+      const p2 = document.getElementById("confirmUserPassword").value;
+      const box = document.getElementById("changePasswordStatusBox");
+      const btn = document.getElementById("btnSubmitNewPass");
+
+      if (p1.length < 8) {
+        box.className = "text-xs rounded-xl p-2.5 bg-rose-50 text-rose-700 border border-rose-200 font-semibold";
+        box.textContent = "पासवर्ड किमान ८ अक्षरी असावा.";
+        return;
+      }
+      if (p1 !== p2) {
+        box.className = "text-xs rounded-xl p-2.5 bg-rose-50 text-rose-700 border border-rose-200 font-semibold";
+        box.textContent = "दोन्ही पासवर्ड सारखे नाहीत!";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "अपडेट होत आहे...";
+      try {
+        await sbFetch("/auth/v1/user", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: p1 })
+        });
+        showToast("तुमचा नवीन पासवर्ड यशस्वीरीत्या सेव्ह झाला आहे!", "success");
+        closeChangePasswordModal();
+      } catch (err) {
+        box.className = "text-xs rounded-xl p-2.5 bg-rose-50 text-rose-700 border border-rose-200 font-semibold";
+        box.textContent = "Error: " + err.message;
+        showToast("Error: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "पासवर्ड अपडेट करा";
+      }
+    }
+
+    async function handleAdminResetUserPassword(e) {
+      e.preventDefault();
+      const session = getSession();
+      const role = (session?.role || "").trim().toLowerCase();
+      if (!["admin", "superadmin"].includes(role)) {
+        showToast("फक्त Admin लाच पासवर्ड रीसेट करण्याचे अधिकार आहेत!", "error");
+        return;
+      }
+
+      const targetUserId = document.getElementById("adminResetTargetUserSelect").value;
+      const statusBox = document.getElementById("adminResetPassStatusBox");
+      const btn = document.getElementById("btnAdminResetPassSubmit");
+      if (!targetUserId) return;
+
+      const targetProf = orgData.profiles.find(p => p.id === targetUserId);
+      const userLabel = targetProf ? `${targetProf.full_name || targetProf.username} (${targetProf.username})` : targetUserId;
+
+      btn.disabled = true;
+      btn.textContent = "पासवर्ड रीसेट होत आहे...";
+      statusBox.textContent = "Supabase वर पासवर्ड रीसेट होत आहे, कृपया प्रतीक्षा करा...";
+
+      try {
+        const res = await sbFetch("/functions/v1/admin-reset-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            target_user_id: targetUserId,
+            new_password: "Plbc@2026#"
+          })
+        });
+        statusBox.innerHTML = `<span class="text-emerald-700 font-bold">यशस्वी! <code>${userLabel}</code> यांचा पासवर्ड रीसेट होऊन <code class="bg-emerald-100 px-1.5 py-0.5 rounded">Plbc@2026#</code> सेट झाला आहे.</span>`;
+        showToast(`पासवर्ड Plbc@2026# वर रीसेट झाला!`, "success");
+      } catch (err) {
+        statusBox.innerHTML = `<span class="text-rose-600 font-semibold">Reset Error: ${err.message}</span>`;
+        showToast("Reset Error: " + err.message, "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "🔄 Password रीसेट करून Plbc@2026# करा";
+      }
     }
 
     window.addEventListener("DOMContentLoaded", async () => {
