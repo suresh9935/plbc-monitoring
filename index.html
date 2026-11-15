@@ -397,6 +397,10 @@
                 <option value="5">आवर्तन क्र. 5</option>
                 <option value="ALL">सर्व आवर्तने (All Rotations)</option>
               </select>
+              <button type="button" id="btnToggleAllLogs" onclick="toggleAllReportLogs()"
+                class="bg-slate-100 hover:bg-slate-200 text-wrdNavy border border-slate-300 text-xs font-bold px-3 py-2.5 rounded-xl transition">
+                👁️ सर्व Logs उघडा
+              </button>
               <button onclick="printConsolidatedReport()" class="bg-wrdNavy hover:bg-wrdBlue text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">
                 🖨️ अहवाल Print / PDF Save करा
               </button>
@@ -2062,6 +2066,42 @@
       return result;
     }
 
+    let allReportLogsExpanded = false;
+
+    function toggleSingleReportLog(rowId, btn) {
+      const box = document.getElementById(rowId);
+      if (!box) return;
+      const isHidden = box.classList.contains("hidden");
+      box.classList.toggle("hidden", !isHidden);
+      if (btn) {
+        const countMatch = btn.textContent.match(/\((\d+)\)/);
+        const cnt = countMatch ? countMatch[1] : "";
+        btn.innerHTML = isHidden
+          ? `<span>🔼 Hide Log (${cnt})</span>`
+          : `<span>📋 View Log (${cnt})</span>`;
+      }
+    }
+
+    function toggleAllReportLogs() {
+      allReportLogsExpanded = !allReportLogsExpanded;
+      const boxes = document.querySelectorAll(".report-log-details");
+      boxes.forEach(box => {
+        box.classList.toggle("hidden", !allReportLogsExpanded);
+        const btn = box.previousElementSibling;
+        if (btn && btn.tagName === "BUTTON") {
+          const countMatch = btn.textContent.match(/\((\d+)\)/);
+          const cnt = countMatch ? countMatch[1] : "";
+          btn.innerHTML = allReportLogsExpanded
+            ? `<span>🔼 Hide Log (${cnt})</span>`
+            : `<span>📋 View Log (${cnt})</span>`;
+        }
+      });
+      const masterBtn = document.getElementById("btnToggleAllLogs");
+      if (masterBtn) {
+        masterBtn.textContent = allReportLogsExpanded ? "🙈 सर्व Logs लपवा" : "👁️ सर्व Logs उघडा";
+      }
+    }
+
     function renderConsolidatedReport() {
       const tbody = document.getElementById("consolidatedReportTableBody");
       if (!tbody) return;
@@ -2124,8 +2164,15 @@
       tbody.innerHTML = list.map((st, idx) => {
         const isOn = (st.current_status || "").toUpperCase() === "ON" || Number(st.current_discharge_cfs || 0) > 0;
         const meta = metaMap.get(st.id) || { rotationHtml: "-", startDateText: "-", waterUsedHtml: "-", stepLogs: [], updatedByText: "-" };
+        const safeRowId = `rep_logs_${idx}`;
         const logsHtml = meta.stepLogs.length > 0
-          ? meta.stepLogs.map(l => `<div class="text-[11px] text-slate-600 leading-snug">• ${l}</div>`).join("")
+          ? `<button type="button" onclick="toggleSingleReportLog('${safeRowId}', this)"
+               class="no-print inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-sky-100 hover:bg-sky-200 text-wrdNavy border border-sky-300 transition">
+               <span>📋 View Log (${meta.stepLogs.length})</span>
+             </button>
+             <div id="${safeRowId}" class="report-log-details hidden mt-1.5 space-y-1 bg-slate-50 p-2 rounded-lg border border-slate-200 max-h-48 overflow-y-auto">
+               ${meta.stepLogs.map(l => `<div class="text-[11px] text-slate-700 leading-snug">• ${l}</div>`).join("")}
+             </div>`
           : `<span class="text-xs text-slate-400">—</span>`;
         return `
           <tr class="hover:bg-slate-50 align-top">
