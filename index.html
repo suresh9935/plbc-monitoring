@@ -1455,7 +1455,7 @@
           sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
           sbFetch("/rest/v1/distributary_operation_state?select=*").catch(() => []),
           sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
-          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,status_after_event,discharge_cfs,rotation_period_days,remarks,recorded_by,season,rotation_no&order=event_time.desc&limit=1000").catch(() => [])
+          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,created_at,status_after_event,discharge_cfs,rotation_period_days,remarks,recorded_by,season,rotation_no&order=event_time.desc&limit=1000").catch(() => [])
         ]);
 
         // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून सर्व आकडे Android App प्रमाणेच 100% जुळतील
@@ -2111,15 +2111,16 @@
             : (isOn ? nowMs : t1);
 
           const dtSec = Math.max(0, (t2 - t1) / 1000);
+          const sysTimeTag = cur.created_at ? ` | नोंद वेळ: ${formatDt(cur.created_at)}` : "";
           if (q > 0) {
             totalActiveSec += dtSec;
             const segMcm = q * dtSec * CUSEC_SEC_TO_MCM;
             totalMcm += segMcm;
             const hrs = (dtSec / 3600).toFixed(1);
-            stepLogs.push(`${formatDt(cur.event_time)} → ${q.toFixed(1)} Cusecs (${hrs} तास = ${segMcm.toFixed(4)} MCM) — [${stepOfficer}]`);
+            stepLogs.push(`${formatDt(cur.event_time)} → ${q.toFixed(1)} Cusecs (${hrs} तास = ${segMcm.toFixed(4)} MCM) — [${stepOfficer}${sysTimeTag}]`);
           } else if (isClosedSeg) {
             const hrs = (dtSec / 3600).toFixed(1);
-            stepLogs.push(`${formatDt(cur.event_time)} → बंद (CLOSE • ${hrs} तास बंद) — [${stepOfficer}]`);
+            stepLogs.push(`${formatDt(cur.event_time)} → बंद (CLOSE • ${hrs} तास बंद) — [${stepOfficer}${sysTimeTag}]`);
           }
         }
 
@@ -2151,14 +2152,16 @@
           ? `<div class="font-bold text-wrdNavy">${totalMcm.toFixed(4)} MCM</div><div class="text-[11px] text-slate-600">(${totalTmc.toFixed(4)} TMC • ${stepLogs.length} टप्पे)</div>`
           : "-";
 
-        // सर्वात शेवटी ज्या अधिकाऱ्याने नोंद/बदल केला त्याचे नाव (कोणत्याही घटनेवरून)
-        let latestRecordedBy = null;
-        for (let i = evList.length - 1; i >= 0; i--) {
-          if (evList[i].recorded_by) {
-            latestRecordedBy = evList[i].recorded_by;
-            break;
-          }
-        }
+        // प्रत्यक्ष System Time (created_at) नुसार सर्वात शेवटी कोणी एन्ट्री केली ते शोधा (बॅक-डेट एन्ट्री असली तरी अचूक कळेल)
+        const allStructEvents = orgData.operationEvents
+          .filter(e => e.structure_id === s.id && e.recorded_by)
+          .sort((a, b) => {
+            const sysA = new Date(a.created_at || a.event_time || 0).getTime();
+            const sysB = new Date(b.created_at || b.event_time || 0).getTime();
+            return sysB - sysA;
+          });
+
+        const latestRecordedBy = allStructEvents[0]?.recorded_by || null;
         const officerId = latestRecordedBy || s.op_updated_by || null;
         const updatedByText = officerId ? (profMap.get(officerId) || "अधिकारी") : "-";
 
