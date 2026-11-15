@@ -59,6 +59,21 @@
       }
       .no-print { display: none !important; }
     }
+    /* Fit to Window / Compact Desktop Mode */
+    body.fit-window-mode {
+      zoom: 0.88;
+    }
+    body.fit-window-mode .max-w-7xl {
+      max-width: 98vw !important;
+    }
+    body.fit-window-mode table th,
+    body.fit-window-mode table td {
+      padding-top: 0.45rem !important;
+      padding-bottom: 0.45rem !important;
+      padding-left: 0.6rem !important;
+      padding-right: 0.6rem !important;
+      font-size: 0.78rem !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between antialiased">
@@ -67,19 +82,19 @@
   <div id="toastContainer" class="fixed top-4 right-4 z-50 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
 
   <!-- ==================== 1. UNAUTHENTICATED: LOGIN & SELF-SIGNUP VIEW ==================== -->
-  <div id="authSection" class="flex-grow flex items-center justify-center p-4 sm:p-6">
-    <div class="w-full max-w-xl space-y-5">
+  <div id="authSection" class="flex-grow flex items-center justify-center p-2 sm:p-3">
+    <div class="w-full max-w-lg space-y-2.5">
 
       <!-- Header Banner -->
-      <div class="bg-gradient-to-r from-wrdNavy to-wrdBlue text-white rounded-2xl p-6 shadow-lg border border-blue-900/30">
+      <div class="bg-gradient-to-r from-wrdNavy to-wrdBlue text-white rounded-xl p-3.5 sm:p-4 shadow-md border border-blue-900/30">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-xs uppercase tracking-wider text-sky-200 font-semibold">महाराष्ट्र शासन • जलसंपदा विभाग</p>
-            <h1 class="text-2xl sm:text-3xl font-bold mt-1">PLBC Water Monitoring</h1>
-            <p class="text-xs sm:text-sm text-slate-200 mt-1">पैठण डावा कालवा (0–208 km) • SUPERADMIN • SDO • SO • Beat Head</p>
+            <p class="text-[11px] uppercase tracking-wider text-sky-200 font-semibold">महाराष्ट्र शासन • जलसंपदा विभाग</p>
+            <h1 class="text-xl sm:text-2xl font-bold mt-0.5">PLBC Water Monitoring</h1>
+            <p class="text-xs text-slate-200 mt-0.5">पैठण डावा कालवा (0–208 km) • SUPERADMIN • SDO • SO • Beat Head</p>
           </div>
-          <div class="bg-white/15 p-3 rounded-xl shrink-0">
-            <svg class="w-8 h-8 text-sky-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <div class="bg-white/15 p-2.5 rounded-xl shrink-0">
+            <svg class="w-6 h-6 text-sky-200" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
             </svg>
           </div>
@@ -204,6 +219,10 @@
             class="bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-emerald-400/40 transition flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full bg-white animate-pulse"></span>
             <span id="autoRefreshLabel">Auto: ON (30s)</span>
+          </button>
+          <button id="btnFitWindowToggle" onclick="toggleFitToWindow()" title="पूर्ण स्क्रीनमध्ये बसवा (Fit to Window)"
+            class="bg-sky-600/80 hover:bg-sky-600 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-sky-400/40 transition">
+            🖥️ Fit Screen: ON
           </button>
           <button onclick="refreshAllAppData(true)" class="bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition">
             ↻ Refresh
@@ -1455,7 +1474,7 @@
           sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
           sbFetch("/rest/v1/distributary_operation_state?select=*").catch(() => []),
           sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
-          sbFetch("/rest/v1/canal_operation_events?select=id,structure_id,event_type,event_time,created_at,status_after_event,discharge_cfs,rotation_period_days,remarks,recorded_by,season,rotation_no&order=event_time.desc&limit=1000").catch(() => [])
+          sbFetch("/rest/v1/canal_operation_events?select=*&order=event_time.desc&limit=5000").catch(() => [])
         ]);
 
         // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून सर्व आकडे Android App प्रमाणेच 100% जुळतील
@@ -2152,16 +2171,17 @@
           ? `<div class="font-bold text-wrdNavy">${totalMcm.toFixed(4)} MCM</div><div class="text-[11px] text-slate-600">(${totalTmc.toFixed(4)} TMC • ${stepLogs.length} टप्पे)</div>`
           : "-";
 
-        // प्रत्यक्ष System Time (created_at) नुसार सर्वात शेवटी कोणी एन्ट्री केली ते शोधा (बॅक-डेट एन्ट्री असली तरी अचूक कळेल)
+        // प्रत्यक्ष System Time (created_at) नुसार सर्वात शेवटी कोणी एन्ट्री केली ते शोधा
+        const getEvUser = (e) => e?.recorded_by || e?.updated_by || e?.created_by || e?.user_id || null;
         const allStructEvents = orgData.operationEvents
-          .filter(e => e.structure_id === s.id && e.recorded_by)
+          .filter(e => e.structure_id === s.id && getEvUser(e))
           .sort((a, b) => {
             const sysA = new Date(a.created_at || a.event_time || 0).getTime();
             const sysB = new Date(b.created_at || b.event_time || 0).getTime();
             return sysB - sysA;
           });
 
-        const latestRecordedBy = allStructEvents[0]?.recorded_by || null;
+        const latestRecordedBy = getEvUser(allStructEvents[0]);
         const officerId = latestRecordedBy || s.op_updated_by || null;
         const updatedByText = officerId ? (profMap.get(officerId) || "अधिकारी") : "-";
 
@@ -2400,7 +2420,28 @@
       }
     }
 
+    // ==================== FIT TO WINDOW SETTING ====================
+    function applyFitToWindowSetting(isFit) {
+      document.body.classList.toggle("fit-window-mode", isFit);
+      const btn = document.getElementById("btnFitWindowToggle");
+      if (btn) {
+        btn.textContent = isFit ? "🖥️ Fit Screen: ON" : "🖥️ Fit Screen: OFF";
+        btn.className = isFit
+          ? "bg-sky-600/90 hover:bg-sky-600 text-white text-xs font-semibold px-3 py-2 rounded-xl border border-sky-300/50 transition"
+          : "bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-3 py-2 rounded-xl transition";
+      }
+      localStorage.setItem("plbc_fit_window", isFit ? "1" : "0");
+    }
+
+    function toggleFitToWindow() {
+      const current = document.body.classList.contains("fit-window-mode");
+      applyFitToWindowSetting(!current);
+    }
+
     window.addEventListener("DOMContentLoaded", async () => {
+      const savedFit = localStorage.getItem("plbc_fit_window");
+      const defaultFit = savedFit === null ? (window.innerWidth >= 1024) : (savedFit === "1");
+      applyFitToWindowSetting(defaultFit);
       setDefaultOperationDateTime();
       document.getElementById("cfgUrl").value = getSbUrl();
       document.getElementById("cfgKey").value = getSbKey();
