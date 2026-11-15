@@ -2100,6 +2100,7 @@
           const stAfter = (cur.status_after_event || "").toUpperCase();
           const isClosedSeg = evType === "CLOSE" || evType === "STOP" || stAfter === "OFF" || stAfter === "CLOSED";
           const q = isClosedSeg ? 0 : Number(cur.discharge_cfs || 0);
+          const stepOfficer = cur.recorded_by ? (profMap.get(cur.recorded_by) || "अधिकारी") : "अधिकारी";
 
           const t1 = cur.event_time ? new Date(cur.event_time).getTime() : NaN;
           if (isNaN(t1)) continue;
@@ -2115,10 +2116,10 @@
             const segMcm = q * dtSec * CUSEC_SEC_TO_MCM;
             totalMcm += segMcm;
             const hrs = (dtSec / 3600).toFixed(1);
-            stepLogs.push(`${formatDt(cur.event_time)} → ${q.toFixed(1)} Cusecs (${hrs} तास = ${segMcm.toFixed(4)} MCM)`);
+            stepLogs.push(`${formatDt(cur.event_time)} → ${q.toFixed(1)} Cusecs (${hrs} तास = ${segMcm.toFixed(4)} MCM) — [${stepOfficer}]`);
           } else if (isClosedSeg) {
             const hrs = (dtSec / 3600).toFixed(1);
-            stepLogs.push(`${formatDt(cur.event_time)} → बंद (CLOSE • ${hrs} तास बंद)`);
+            stepLogs.push(`${formatDt(cur.event_time)} → बंद (CLOSE • ${hrs} तास बंद) — [${stepOfficer}]`);
           }
         }
 
@@ -2150,7 +2151,15 @@
           ? `<div class="font-bold text-wrdNavy">${totalMcm.toFixed(4)} MCM</div><div class="text-[11px] text-slate-600">(${totalTmc.toFixed(4)} TMC • ${stepLogs.length} टप्पे)</div>`
           : "-";
 
-        const officerId = lastEv?.recorded_by || firstOpenEv?.recorded_by || s.op_updated_by || null;
+        // सर्वात शेवटी ज्या अधिकाऱ्याने नोंद/बदल केला त्याचे नाव (कोणत्याही घटनेवरून)
+        let latestRecordedBy = null;
+        for (let i = evList.length - 1; i >= 0; i--) {
+          if (evList[i].recorded_by) {
+            latestRecordedBy = evList[i].recorded_by;
+            break;
+          }
+        }
+        const officerId = latestRecordedBy || s.op_updated_by || null;
         const updatedByText = officerId ? (profMap.get(officerId) || "अधिकारी") : "-";
 
         result.set(s.id, {
