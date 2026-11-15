@@ -372,15 +372,35 @@
       <!-- ==================== TAB 3 (REPORT): CONSOLIDATED OPERATION REPORT ==================== -->
       <section id="view-report" class="app-view hidden space-y-6">
         <div id="reportPrintArea" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div>
               <p class="text-[11px] font-bold text-wrdBlue uppercase">महाराष्ट्र शासन • जलसंपदा विभाग • पैठण डावा कालवा (0–208 km)</p>
               <h2 class="text-base sm:text-lg font-bold text-slate-800">एकत्रित संचालन व एकूण पाणी वापर अहवाल (Consolidated Water Use Report)</h2>
               <p id="reportGeneratedMeta" class="text-xs text-slate-500">सर्व वितरिकांचा चालू विसर्ग, शिल्लक दिवस, विसर्ग बदल नोंदी व एकूण पाणी वापर (MCM)</p>
             </div>
-            <button onclick="printConsolidatedReport()" class="no-print bg-wrdNavy hover:bg-wrdBlue text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">
-              🖨️ अहवाल Print / PDF Save करा
-            </button>
+            <div class="no-print flex flex-wrap items-center gap-2">
+              <select id="reportSeasonFilter" onchange="onReportSeasonRotationChange()"
+                class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm font-bold text-wrdNavy bg-sky-50/60 focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="रब्बी 2026-27" selected>हंगाम: रब्बी 2026-27</option>
+                <option value="उन्हाळी 2027">हंगाम: उन्हाळी 2027</option>
+                <option value="खरीप 2027">हंगाम: खरीप 2027</option>
+                <option value="रब्बी 2027-28">हंगाम: रब्बी 2027-28</option>
+                <option value="उन्हाळी 2028">हंगाम: उन्हाळी 2028</option>
+                <option value="ALL">सर्व हंगाम (All Seasons)</option>
+              </select>
+              <select id="reportRotationFilter" onchange="onReportSeasonRotationChange()"
+                class="rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm font-bold text-wrdNavy bg-sky-50/60 focus:outline-none focus:ring-2 focus:ring-wrdAccent">
+                <option value="1" selected>आवर्तन क्र. 1</option>
+                <option value="2">आवर्तन क्र. 2</option>
+                <option value="3">आवर्तन क्र. 3</option>
+                <option value="4">आवर्तन क्र. 4</option>
+                <option value="5">आवर्तन क्र. 5</option>
+                <option value="ALL">सर्व आवर्तने (All Rotations)</option>
+              </select>
+              <button onclick="printConsolidatedReport()" class="bg-wrdNavy hover:bg-wrdBlue text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">
+                🖨️ अहवाल Print / PDF Save करा
+              </button>
+            </div>
           </div>
           <div id="reportSummaryBanner" class="px-4 sm:px-5 py-3 bg-slate-50 border-b border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs"></div>
           <div class="overflow-x-auto">
@@ -1869,6 +1889,31 @@
     function onGlobalSeasonRotationChange() {
       const selSeason = document.getElementById("globalSeasonFilter")?.value;
       const selRot = document.getElementById("globalRotationFilter")?.value;
+      if (selSeason && document.getElementById("reportSeasonFilter")) {
+        document.getElementById("reportSeasonFilter").value = selSeason;
+      }
+      if (selRot && document.getElementById("reportRotationFilter")) {
+        document.getElementById("reportRotationFilter").value = selRot;
+      }
+      if (selSeason && selSeason !== "ALL" && document.getElementById("opSeason")) {
+        document.getElementById("opSeason").value = selSeason;
+      }
+      if (selRot && selRot !== "ALL" && document.getElementById("opRotationNo")) {
+        document.getElementById("opRotationNo").value = selRot;
+      }
+      renderDashboardTables();
+      renderConsolidatedReport();
+    }
+
+    function onReportSeasonRotationChange() {
+      const selSeason = document.getElementById("reportSeasonFilter")?.value;
+      const selRot = document.getElementById("reportRotationFilter")?.value;
+      if (selSeason && document.getElementById("globalSeasonFilter")) {
+        document.getElementById("globalSeasonFilter").value = selSeason;
+      }
+      if (selRot && document.getElementById("globalRotationFilter")) {
+        document.getElementById("globalRotationFilter").value = selRot;
+      }
       if (selSeason && selSeason !== "ALL" && document.getElementById("opSeason")) {
         document.getElementById("opSeason").value = selSeason;
       }
@@ -1884,6 +1929,8 @@
       const r = document.getElementById("opRotationNo")?.value;
       if (s && document.getElementById("globalSeasonFilter")) document.getElementById("globalSeasonFilter").value = s;
       if (r && document.getElementById("globalRotationFilter")) document.getElementById("globalRotationFilter").value = r;
+      if (s && document.getElementById("reportSeasonFilter")) document.getElementById("reportSeasonFilter").value = s;
+      if (r && document.getElementById("reportRotationFilter")) document.getElementById("reportRotationFilter").value = r;
     }
 
     function buildStructureOperationMetaMap() {
@@ -2036,9 +2083,11 @@
 
       const nowStr = new Date().toLocaleString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
       const metaEl = document.getElementById("reportGeneratedMeta");
-      const sLbl = document.getElementById("globalSeasonFilter")?.value || "रब्बी 2026-27";
-      const rLbl = document.getElementById("globalRotationFilter")?.value || "1";
-      if (metaEl) metaEl.textContent = `हंगाम: ${sLbl} • आवर्तन क्र.: ${rLbl} • अहवाल वेळ: ${nowStr}`;
+      const sVal = document.getElementById("reportSeasonFilter")?.value || document.getElementById("globalSeasonFilter")?.value || "रब्बी 2026-27";
+      const rVal = document.getElementById("reportRotationFilter")?.value || document.getElementById("globalRotationFilter")?.value || "1";
+      const sLbl = sVal === "ALL" ? "सर्व हंगाम" : sVal;
+      const rLbl = rVal === "ALL" ? "सर्व आवर्तने" : `आवर्तन क्र. ${rVal}`;
+      if (metaEl) metaEl.textContent = `हंगाम: ${sLbl} • ${rLbl} • अहवाल वेळ: ${nowStr}`;
 
       let onCount = 0;
       let distFlowTotal = 0;
