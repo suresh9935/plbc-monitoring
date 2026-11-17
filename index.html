@@ -1505,32 +1505,63 @@
       }
     }
 
-    // Filter structures visible to logged-in officer
+    // Filter structures strictly visible to logged-in officer (EE1 vs EE2 Division Isolation)
     function getAccessibleStructures() {
       const session = getSession();
       if (!session) return [];
-      const role = session.role;
+      const role = (session.role || "").trim().toLowerCase();
+      const uname = (session.username || "").trim().toLowerCase();
       const mapByStruct = new Map(orgData.structureMappings.map(m => [m.structure_id, m]));
+      const subToDiv = new Map(orgData.subdivisions.map(sd => [sd.id, sd.division_id]));
 
+      // फक्त Admin, Superadmin, CE आणि SE यांनाच संपूर्ण कालव्याचे (0-208 km) सर्व Structures दिसतील
       if (["admin", "superadmin", "ce", "se"].includes(role)) {
         return orgData.structures;
       }
-      if (["division_officer", "ee1", "ee2"].includes(role) && session.division_id) {
-        return orgData.structures.filter(s => s.division_id === session.division_id);
+
+      // Division Officer / EE1 / EE2 साठी विभागीय ओळख (Mapped division_id किंवा username/role नुसार)
+      if (["division_officer", "ee1", "ee2"].includes(role)) {
+        let targetDivId = session.division_id || null;
+
+        // जर profile/user_mappings मध्ये division_id नसेल तर role किंवा username वरून Div 1 / Div 2 ओळखा
+        if (!targetDivId && orgData.divisions.length > 0) {
+          const isDiv2 = role === "ee2" || uname.includes("ee2") || uname.includes("div2") || uname.includes("parbhani");
+          const isDiv1 = role === "ee1" || uname.includes("ee1") || uname.includes("div1") || uname.includes("paithan");
+          if (isDiv2) {
+            const d2 = orgData.divisions.find(d => /div2|parbhani|परभणी|2/i.test(`${d.id} ${d.code || ""} ${d.name || ""}`));
+            targetDivId = d2?.id || null;
+          } else if (isDiv1) {
+            const d1 = orgData.divisions.find(d => /div1|paithan|पैठण|1/i.test(`${d.id} ${d.code || ""} ${d.name || ""}`));
+            targetDivId = d1?.id || null;
+          }
+        }
+
+        if (targetDivId) {
+          return orgData.structures.filter(s => {
+            const m = mapByStruct.get(s.id);
+            const mappedDiv = m?.subdivision_id ? subToDiv.get(m.subdivision_id) : null;
+            return (s.division_id === targetDivId) || (mappedDiv === targetDivId);
+          });
+        }
+        return []; // Division मॅप नसल्यास दुसऱ्या विभागाचा डेटा दाखवू नये
       }
-      if (["sdo", "subdivision_officer"].includes(role) && session.subdivision_id) {
-        return orgData.structures.filter(s => {
-          const m = mapByStruct.get(s.id);
-          return (m && m.subdivision_id === session.subdivision_id) || (!m && s.division_id === session.division_id);
-        });
+
+      if (["sdo", "subdivision_officer"].includes(role)) {
+        if (!session.subdivision_id) return [];
+        return orgData.structures.filter(s => mapByStruct.get(s.id)?.subdivision_id === session.subdivision_id);
       }
-      if (["section_officer", "branch_officer"].includes(role) && session.branch_id) {
+
+      if (["section_officer", "branch_officer"].includes(role)) {
+        if (!session.branch_id) return [];
         return orgData.structures.filter(s => mapByStruct.get(s.id)?.branch_id === session.branch_id);
       }
-      if (["beat_head", "staff"].includes(role) && session.beat_id) {
+
+      if (["beat_head", "staff"].includes(role)) {
+        if (!session.beat_id) return [];
         return orgData.structures.filter(s => mapByStruct.get(s.id)?.beat_id === session.beat_id);
       }
-      return orgData.structures;
+
+      return [];
     }
 
     // KPI Card click & dropdown synchronization
@@ -1588,6 +1619,8 @@
         if (s.tail_reached) tailCount++;
       });
 
+      const mc01Card = document.getElementById("kpiHeadMcDischarge")?.parentElement;
+      if (mc01Card) mc01Card.style.display = mc01 ? "" : "none";
       const mc01IsOn = mc01 && ((mc01.current_status || "").toUpperCase() === "ON" || mc01Discharge > 0);
       document.getElementById("kpiHeadMcDischarge").textContent = mc01Discharge.toFixed(2);
       document.getElementById("kpiHeadMcStatus").textContent = mc01
@@ -1675,7 +1708,8 @@
       // Events table (filtered by active Season & Rotation No.)
       const evBody = document.getElementById("eventsTableBody");
       const structMap = new Map(orgData.structures.map(s => [s.id, s.name]));
-      const filteredEvList = getFilteredSeasonRotationEvents();
+      const accessibleIds = new Set(structures.map(s => s.id));
+      const filteredEvList = getFilteredSeasonRotationEvents().filter(ev => accessibleIds.has(ev.structure_id));
       if (filteredEvList.length === 0) {
         evBody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400">निवडलेल्या हंगाम व आवर्तनामध्ये अद्याप संचालन नोंद नाही.</td></tr>`;
       } else {
