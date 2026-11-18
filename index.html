@@ -1435,13 +1435,28 @@
     async function refreshAllAppData(isManual = false) {
       try {
         await loadPublicOrgData();
+        const session = getSession();
+        const uidFilter = session?.user_id ? `?user_id=eq.${session.user_id}&select=*` : "?select=*";
+
         const [structures, opStates, mappings, userMaps, events] = await Promise.all([
           sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
           sbFetch("/rest/v1/distributary_operation_state?select=*").catch(() => []),
           sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
-          sbFetch("/rest/v1/user_mappings?select=*").catch(() => []),
+          sbFetch(`/rest/v1/user_mappings${uidFilter}`).catch(() => []),
           sbFetch("/rest/v1/canal_operation_events?select=*&order=event_time.desc&limit=5000").catch(() => [])
         ]);
+
+        // Supabase मधून ताजे user_mappings मिळाले की localStorage सेशनमध्येही अचूक UUID सेव्ह करा
+        if (session && Array.isArray(userMaps) && userMaps.length > 0) {
+          const u = userMaps[0];
+          saveSession({
+            ...session,
+            division_id: u.division_id || session.division_id || null,
+            subdivision_id: u.subdivision_id || session.subdivision_id || null,
+            branch_id: u.branch_id || session.branch_id || null,
+            beat_id: u.beat_id || session.beat_id || null
+          });
+        }
 
         const stateMap = new Map((opStates || []).map(st => [st.structure_id, st]));
         orgData.structures = (structures || []).map(s => {
@@ -1490,75 +1505,75 @@
       }
     }
 
-    // MC-01 (धरणातील विसर्ग) सर्व अधिकाऱ्यांना दिसेल + इतर Structures फक्त लॉगिन युझरच्या Role व अधिकारक्षेत्रानुसार फिल्टर होतील
+    // Supabase डेटाबेसमधील प्रत्यक्ष नोंदींच्या (user_mappings UUID + plbc_structure_mapping) आधारे अचूक Structures फिल्टर
     function getAccessibleStructures() {
       const session = getSession();
       if (!session) return [];
       const role = (session.role || "").trim().toLowerCase();
-      const uname = (session.username || "").trim().toLowerCase();
       const isMc01 = (s) => (s.id || "").trim().toUpperCase() === "MC-01";
-      const mapByStruct = new Map(orgData.structureMappings.map(m => [m.structure_id, m]));
-      const subToDiv = new Map(orgData.subdivisions.map(sd => [sd.id, sd.division_id]));
-      const liveUserMap = orgData.userMappings.find(u => u.user_id === session.user_id) || {};
 
-      const effectiveDivId = liveUserMap.division_id || session.division_id || null;
-      const effectiveSubdivId = liveUserMap.subdivision_id || session.subdivision_id || null;
-      const effectiveBranchId = liveUserMap.branch_id || session.branch_id || null;
-      const effectiveBeatId = liveUserMap.beat_id || session.beat_id || null;
-
-      // 1. फक्त Admin, Superadmin, CE आणि SE यांनाच संपूर्ण कालव्याचे (0-208 km) सर्व Structures दिसतील
+      // 1. Admin, Superadmin, CE आणि SE यांना संपूर्ण कालव्याचे सर्व Structures दिसतील
       if (["admin", "superadmin", "ce", "se"].includes(role)) {
         return orgData.structures;
       }
 
-      // 2. Division Officer / EE1 / EE2: MC-01 + फक्त त्यांचाच विभाग
-      if (["division_officer", "ee1", "ee2"].includes(role)) {
-        let targetDivId = effectiveDivId;
-        if (!targetDivId && orgData.divisions.length > 0) {
-          const isDiv2 = role === "ee2" || uname.includes("ee2") || uname.includes("div2") || uname.includes("parbhani");
-          const isDiv1 = role === "ee1" || uname.includes("ee1") || uname.includes("div1") || uname.includes("paithan");
-          if (isDiv2) {
-            const d2 = orgData.divisions.find(d => /div2|parbhani|परभणी|2/i.test(`${d.id} ${d.code || ""} ${d.name || ""}`));
-            targetDivId = d2?.id || null;
-          } else if (isDiv1) {
-            const d1 = orgData.divisions.find(d => /div1|paithan|पैठण|1/i.test(`${d.id} ${d.code || ""} ${d.name || ""}`));
-            targetDivId = d1?.id || null;
-          }
-        }
+      const liveUserMap = orgData.userMappings.find(u => String(u.user_id) === String(session.user_id)) || {};
+      const mapByStruct = new Map(orgData.structureMappings.map(m => [String(m.structure_id).trim(), m]));
 
-        if (targetDivId) {
-          return orgData.structures.filter(s => {
-            if (isMc01(s)) return true;
-            const m = mapByStruct.get(s.id);
-            const mappedDiv = m?.subdivision_id ? subToDiv.get(m.subdivision_id) : null;
-            return (s.division_id === targetDivId) || (mappedDiv === targetDivId);
-          });
-        }
-        return orgData.structures.filter(s => isMc01(s));
+      const effectiveDivId = String(liveUserMap.division_id || session.division_id || "").trim().toLowerCase();
+      const effectiveSubdivId = String(liveUserMap.subdivision_id || session.subdivision_id || "").trim().toLowerCase();
+      const effectiveBranchId = String(liveUserMap.branch_id || session.branch_id || "").trim().toLowerCase();
+      const effectiveBeatId = String(liveUserMap.beat_id || session.beat_id || "").trim().toLowerCase();
+
+      // 2. Division Officer / EE1 / EE2
+      if (["division_officer", "ee1", "ee2"].includes(role)) {
+        if (!effectiveDivId) return orgData.structures.filter(s => isMc01(s));
+        const subToDiv = new Map(orgData.subdivisions.map(sd => [
+          String(sd.id).trim().toLowerCase(),
+          String(sd.division_id || "").trim().toLowerCase()
+        ]));
+
+        return orgData.structures.filter(s => {
+          if (isMc01(s)) return true;
+          const sDiv = String(s.division_id || "").trim().toLowerCase();
+          const m = mapByStruct.get(String(s.id).trim());
+          const mappedSub = m?.subdivision_id ? String(m.subdivision_id).trim().toLowerCase() : "";
+          const mappedDiv = mappedSub ? (subToDiv.get(mappedSub) || "") : "";
+          return sDiv === effectiveDivId || mappedDiv === effectiveDivId;
+        });
       }
 
-      // 3. SDO / Subdivision Officer: MC-01 + त्यांच्या उपविभागाला मॅप केलेले Structures
+      // 3. SDO / Subdivision Officer
       if (["sdo", "subdivision_officer"].includes(role)) {
         if (!effectiveSubdivId) return orgData.structures.filter(s => isMc01(s));
-        return orgData.structures.filter(s =>
-          isMc01(s) || mapByStruct.get(s.id)?.subdivision_id === effectiveSubdivId
-        );
+        return orgData.structures.filter(s => {
+          if (isMc01(s)) return true;
+          const m = mapByStruct.get(String(s.id).trim());
+          if (!m || !m.subdivision_id) return false;
+          return String(m.subdivision_id).trim().toLowerCase() === effectiveSubdivId;
+        });
       }
 
-      // 4. Section Officer / Branch Officer: MC-01 + SDO किंवा Admin ने त्यांच्या शाखेला मॅप केलेले Structures
+      // 4. Section Officer / Branch Officer
       if (["section_officer", "branch_officer"].includes(role)) {
         if (!effectiveBranchId) return orgData.structures.filter(s => isMc01(s));
-        return orgData.structures.filter(s =>
-          isMc01(s) || mapByStruct.get(s.id)?.branch_id === effectiveBranchId
-        );
+        return orgData.structures.filter(s => {
+          if (isMc01(s)) return true;
+          const m = mapByStruct.get(String(s.id).trim());
+          if (!m || !m.branch_id) return false;
+          return String(m.branch_id).trim().toLowerCase() === effectiveBranchId;
+        });
       }
 
-      // 5. Beat Head / Staff: MC-01 + त्यांच्या बीटला मॅप केलेले Structures
+      // 5. Beat Head / Staff
       if (["beat_head", "staff"].includes(role)) {
         if (!effectiveBeatId) return orgData.structures.filter(s => isMc01(s));
-        return orgData.structures.filter(s =>
-          isMc01(s) || mapByStruct.get(s.id)?.beat_id === effectiveBeatId
-        );
+        return orgData.structures.filter(s => {
+          if (isMc01(s)) return true;
+          const m = mapByStruct.get(String(s.id).trim());
+          if (!m || !m.beat_id) return false;
+          return String(m.beat_id).trim().toLowerCase() === effectiveBeatId;
+        });
       }
 
       return orgData.structures.filter(s => isMc01(s));
