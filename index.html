@@ -33,7 +33,6 @@
       background-color: #F1F5F9;
       color: #0F172A;
     }
-    /* Custom scrollbar for clean tables */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #E2E8F0; }
     ::-webkit-scrollbar-thumb { background: #94A3B8; border-radius: 9999px; }
@@ -59,7 +58,6 @@
       }
       .no-print { display: none !important; }
     }
-
   </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between antialiased">
@@ -276,7 +274,7 @@
           </div>
         </div>
 
-        <!-- Clickable KPI Summary Cards (धरणातून विसर्ग स्वतंत्र + वितरिका विसर्ग स्वतंत्र) -->
+        <!-- Clickable KPI Summary Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           <div class="bg-gradient-to-br from-sky-50 to-blue-100/70 rounded-2xl p-4 sm:p-5 shadow-sm border-2 border-sky-600 transition hover:shadow-md">
             <p class="text-xs font-bold text-sky-900">धरणातून सोडलेला विसर्ग (MC-01)</p>
@@ -575,7 +573,7 @@
               <h2 class="text-lg font-bold text-wrdNavy">Structure → Section Officer Mapping</h2>
               <p class="text-xs text-slate-500 mt-0.5">ही स्क्रीन <code class="bg-slate-100 px-1 rounded">plbc_structure_mapping</code> टेबल अपडेट करते.</p>
             </div>
-            <button type="button" onclick="refreshAllAppData()" class="border border-slate-300 hover:bg-slate-50 text-xs font-bold px-3 py-1.5 rounded-lg">
+            <button type="button" onclick="refreshAllAppData(true)" class="border border-slate-300 hover:bg-slate-50 text-xs font-bold px-3 py-1.5 rounded-lg">
               REFRESH
             </button>
           </div>
@@ -848,7 +846,6 @@
 
   <!-- ==================== JAVASCRIPT APPLICATION LOGIC ==================== -->
   <script>
-    // 1. SUPABASE CONFIGURATION
     const DEFAULT_SB_URL = "https://avcnvqqrhzdymehxxouh.supabase.co";
     const DEFAULT_SB_KEY = "sb_publishable_mDDvfpPt99i_rRonuwy_kw_SKb67eB1";
     const STORAGE_KEY = "plbc_web_session_v1";
@@ -873,19 +870,18 @@
       localStorage.removeItem(STORAGE_KEY);
     }
 
-    // Global State
     let orgData = {
       divisions: [],
       subdivisions: [],
       branches: [],
       beats: [],
       profiles: [],
+      userMappings: [],
       structures: [],
       structureMappings: [],
       operationEvents: []
     };
 
-    // Toast Notification Helper (Never uses alert())
     function showToast(message, type = "info") {
       const container = document.getElementById("toastContainer");
       const colors = {
@@ -926,7 +922,6 @@
       loadPublicOrgData();
     }
 
-    // Silently renew Supabase JWT access_token using refresh_token so user stays logged in permanently
     let refreshTokenPromise = null;
     async function ensureValidAccessToken(forceRefresh = false) {
       const session = getSession();
@@ -972,7 +967,6 @@
       return await refreshTokenPromise;
     }
 
-    // Generic Supabase REST Fetch Helper (with automatic silent token renewal on 401)
     async function sbFetch(path, options = {}, retried = false) {
       const token = await ensureValidAccessToken(false);
       const headers = {
@@ -998,7 +992,6 @@
       return data;
     }
 
-    // 2. AUTHENTICATION (LOGIN / LOGOUT / SELF-SIGNUP)
     function switchAuthTab(tab) {
       const loginPanel = document.getElementById("loginPanel");
       const signupPanel = document.getElementById("signupPanel");
@@ -1029,8 +1022,8 @@
       if (!identifier || !password) return;
 
       const email = identifier.includes("@")
-  ? identifier.toLowerCase()
-  : `${identifier.toLowerCase()}@plbc-wrd.com`;
+        ? identifier.toLowerCase()
+        : `${identifier.toLowerCase()}@plbc-wrd.com`;
 
       btn.disabled = true;
       btn.textContent = "Login तपासत आहे...";
@@ -1056,7 +1049,6 @@
         const expiresAt = Date.now() + (expiresIn * 1000);
         const uid = authData.user.id;
 
-        // Fetch profile
         const profResp = await fetch(`${getSbUrl()}/rest/v1/profiles?id=eq.${uid}&select=id,full_name,username,role,division_id,is_active`, {
           headers: { "apikey": getSbKey(), "Authorization": `Bearer ${token}` }
         });
@@ -1067,7 +1059,6 @@
           throw new Error("हा User Inactive आहे. कृपया Admin / SDO शी संपर्क करा.");
         }
 
-        // Fetch user_mappings
         const mapResp = await fetch(`${getSbUrl()}/rest/v1/user_mappings?user_id=eq.${uid}&select=*`, {
           headers: { "apikey": getSbKey(), "Authorization": `Bearer ${token}` }
         });
@@ -1110,7 +1101,6 @@
       showToast("यशस्वीरीत्या Logout झाले.", "info");
     }
 
-    // 3. USER CREATION & AUTO USER ID GENERATION (SHARED BY PUBLIC & ADMIN)
     function mountUserCreateForms() {
       const tpl = document.getElementById("userCreateFormTemplate");
       ["signupFormContainer", "adminUserFormContainer"].forEach(containerId => {
@@ -1205,7 +1195,6 @@
       const brId = form.elements["branchId"].value;
       const btId = form.elements["beatId"].value;
 
-      // Enable/disable dropdowns based on hierarchy
       const enabled =
         ["ce", "se", "ee1", "ee2"].includes(role) ? [] :
         role === "division_officer" ? ["d"] :
@@ -1295,14 +1284,12 @@
       try {
         const session = getSession();
         if (session?.access_token) {
-          // Authenticated Admin/SDO call
           await sbFetch("/functions/v1/admin-create-user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
           });
         } else {
-          // Public Self-Signup
           const signUpRes = await fetch(`${getSbUrl()}/auth/v1/signup`, {
             method: "POST",
             headers: {
@@ -1343,7 +1330,6 @@
       }
     }
 
-    // 4. AUTHENTICATED APP INITIALIZATION & ROLE PERMISSIONS
     async function enterAuthenticatedApp() {
       const session = getSession();
       if (!session) return;
@@ -1354,7 +1340,6 @@
       document.getElementById("headerUserName").textContent = `${session.full_name} (${session.username})`;
       document.getElementById("headerUserRole").textContent = session.role.replace("_", " ");
 
-      // Role-based tab visibility (फक्त Admin आणि SDO यांनाच Mapping, Beat Master व User Creation दिसेल; EE, SE, CE यांना १००% बंद)
       const role = (session.role || "").trim().toLowerCase();
       const canMap = ["admin", "superadmin", "sdo", "subdivision_officer"].includes(role);
       const canBeat = ["admin", "superadmin", "sdo", "subdivision_officer", "section_officer", "branch_officer"].includes(role);
@@ -1373,7 +1358,6 @@
       elUsers.classList.toggle("hidden", !canUsers);
       elUsers.style.display = canUsers ? "" : "none";
 
-      // फक्त Admin / Superadmin लाच पासवर्ड रीसेट कार्ड दिसेल
       const isPureAdmin = ["admin", "superadmin"].includes(role);
       const resetCard = document.getElementById("adminPasswordResetCard");
       if (resetCard) {
@@ -1419,7 +1403,6 @@
       if (!autoRefreshEnabled) return;
       autoRefreshTimerId = setInterval(() => {
         if (document.hidden || !getSession()) return;
-        // जर युजर सध्या फॉर्ममध्ये माहिती टाईप करत असेल तर त्यात व्यत्यय नको
         const activeTag = document.activeElement?.tagName;
         if (activeTag === "INPUT" || activeTag === "SELECT" || activeTag === "TEXTAREA") return;
         refreshAllAppData(false);
@@ -1452,23 +1435,25 @@
     async function refreshAllAppData(isManual = false) {
       try {
         await loadPublicOrgData();
-        const [structures, opStates, mappings, events] = await Promise.all([
+        const [structures, opStates, mappings, userMaps, events] = await Promise.all([
           sbFetch("/rest/v1/structures?select=id,name,structure_type,length_km,division_id,design_discharge_cfs,current_status,current_discharge_cfs,tail_reached&order=division_id,id").catch(() => []),
           sbFetch("/rest/v1/distributary_operation_state?select=*").catch(() => []),
           sbFetch("/rest/v1/plbc_structure_mapping?select=structure_id,subdivision_id,branch_id,beat_id").catch(() => []),
+          sbFetch("/rest/v1/user_mappings?select=*").catch(() => []),
           sbFetch("/rest/v1/canal_operation_events?select=*&order=event_time.desc&limit=5000").catch(() => [])
         ]);
 
-        // दोन्ही टेबल्स (structures + distributary_operation_state) एकत्र विलीन करा जेणेकरून सर्व आकडे Android App प्रमाणेच 100% जुळतील
         const stateMap = new Map((opStates || []).map(st => [st.structure_id, st]));
         orgData.structures = (structures || []).map(s => {
           const op = stateMap.get(s.id);
           if (!op) return s;
           const liveFlow = Math.max(Number(s.current_discharge_cfs || 0), Number(op.current_discharge_cfs || 0));
-          const isLiveOn = (op.status || "").toLowerCase() === "running" ||
-                           (op.status || "").toLowerCase() === "on" ||
-                           (s.current_status || "").toUpperCase() === "ON" ||
-                           liveFlow > 0;
+          const isLiveOn = liveFlow > 0 && (
+            (op.status || "").toLowerCase() === "running" ||
+            (op.status || "").toLowerCase() === "on" ||
+            (s.current_status || "").toUpperCase() === "ON" ||
+            liveFlow > 0
+          );
           return {
             ...s,
             current_status: isLiveOn ? "ON" : "OFF",
@@ -1481,9 +1466,9 @@
         });
 
         orgData.structureMappings = mappings || [];
+        orgData.userMappings = userMaps || [];
         orgData.operationEvents = events || [];
 
-        // जर युजर सध्या Operation फॉर्मवर नसेल तरच ड्रॉपडाऊन रिसेट करा
         const opViewHidden = document.getElementById("view-operation")?.classList.contains("hidden");
         renderDashboardTables();
         if (!document.getElementById("view-report")?.classList.contains("hidden")) {
@@ -1505,25 +1490,30 @@
       }
     }
 
-    // Filter structures strictly visible to logged-in officer (EE1 vs EE2 Division Isolation)
+    // MC-01 (धरणातील विसर्ग) सर्व अधिकाऱ्यांना दिसेल + इतर Structures फक्त लॉगिन युझरच्या Role व अधिकारक्षेत्रानुसार फिल्टर होतील
     function getAccessibleStructures() {
       const session = getSession();
       if (!session) return [];
       const role = (session.role || "").trim().toLowerCase();
       const uname = (session.username || "").trim().toLowerCase();
+      const isMc01 = (s) => (s.id || "").trim().toUpperCase() === "MC-01";
       const mapByStruct = new Map(orgData.structureMappings.map(m => [m.structure_id, m]));
       const subToDiv = new Map(orgData.subdivisions.map(sd => [sd.id, sd.division_id]));
+      const liveUserMap = orgData.userMappings.find(u => u.user_id === session.user_id) || {};
 
-      // फक्त Admin, Superadmin, CE आणि SE यांनाच संपूर्ण कालव्याचे (0-208 km) सर्व Structures दिसतील
+      const effectiveDivId = liveUserMap.division_id || session.division_id || null;
+      const effectiveSubdivId = liveUserMap.subdivision_id || session.subdivision_id || null;
+      const effectiveBranchId = liveUserMap.branch_id || session.branch_id || null;
+      const effectiveBeatId = liveUserMap.beat_id || session.beat_id || null;
+
+      // 1. फक्त Admin, Superadmin, CE आणि SE यांनाच संपूर्ण कालव्याचे (0-208 km) सर्व Structures दिसतील
       if (["admin", "superadmin", "ce", "se"].includes(role)) {
         return orgData.structures;
       }
 
-      // Division Officer / EE1 / EE2 साठी विभागीय ओळख (Mapped division_id किंवा username/role नुसार)
+      // 2. Division Officer / EE1 / EE2: MC-01 + फक्त त्यांचाच विभाग
       if (["division_officer", "ee1", "ee2"].includes(role)) {
-        let targetDivId = session.division_id || null;
-
-        // जर profile/user_mappings मध्ये division_id नसेल तर role किंवा username वरून Div 1 / Div 2 ओळखा
+        let targetDivId = effectiveDivId;
         if (!targetDivId && orgData.divisions.length > 0) {
           const isDiv2 = role === "ee2" || uname.includes("ee2") || uname.includes("div2") || uname.includes("parbhani");
           const isDiv1 = role === "ee1" || uname.includes("ee1") || uname.includes("div1") || uname.includes("paithan");
@@ -1538,33 +1528,42 @@
 
         if (targetDivId) {
           return orgData.structures.filter(s => {
+            if (isMc01(s)) return true;
             const m = mapByStruct.get(s.id);
             const mappedDiv = m?.subdivision_id ? subToDiv.get(m.subdivision_id) : null;
             return (s.division_id === targetDivId) || (mappedDiv === targetDivId);
           });
         }
-        return []; // Division मॅप नसल्यास दुसऱ्या विभागाचा डेटा दाखवू नये
+        return orgData.structures.filter(s => isMc01(s));
       }
 
+      // 3. SDO / Subdivision Officer: MC-01 + त्यांच्या उपविभागाला मॅप केलेले Structures
       if (["sdo", "subdivision_officer"].includes(role)) {
-        if (!session.subdivision_id) return [];
-        return orgData.structures.filter(s => mapByStruct.get(s.id)?.subdivision_id === session.subdivision_id);
+        if (!effectiveSubdivId) return orgData.structures.filter(s => isMc01(s));
+        return orgData.structures.filter(s =>
+          isMc01(s) || mapByStruct.get(s.id)?.subdivision_id === effectiveSubdivId
+        );
       }
 
+      // 4. Section Officer / Branch Officer: MC-01 + SDO किंवा Admin ने त्यांच्या शाखेला मॅप केलेले Structures
       if (["section_officer", "branch_officer"].includes(role)) {
-        if (!session.branch_id) return [];
-        return orgData.structures.filter(s => mapByStruct.get(s.id)?.branch_id === session.branch_id);
+        if (!effectiveBranchId) return orgData.structures.filter(s => isMc01(s));
+        return orgData.structures.filter(s =>
+          isMc01(s) || mapByStruct.get(s.id)?.branch_id === effectiveBranchId
+        );
       }
 
+      // 5. Beat Head / Staff: MC-01 + त्यांच्या बीटला मॅप केलेले Structures
       if (["beat_head", "staff"].includes(role)) {
-        if (!session.beat_id) return [];
-        return orgData.structures.filter(s => mapByStruct.get(s.id)?.beat_id === session.beat_id);
+        if (!effectiveBeatId) return orgData.structures.filter(s => isMc01(s));
+        return orgData.structures.filter(s =>
+          isMc01(s) || mapByStruct.get(s.id)?.beat_id === effectiveBeatId
+        );
       }
 
-      return [];
+      return orgData.structures.filter(s => isMc01(s));
     }
 
-    // KPI Card click & dropdown synchronization
     function applyKpiStatusFilter(filterVal) {
       const sel = document.getElementById("dashStatusFilter");
       if (sel) sel.value = filterVal;
@@ -1592,7 +1591,6 @@
         (filterVal === "tail" ? "border-indigo-600 ring-2 ring-indigo-500/20 bg-indigo-50/40" : "border-slate-200 hover:border-indigo-500");
     }
 
-    // 5. DASHBOARD RENDERING (MC-01 सर्वात वर + सुरू वर + CR वगळून अचूक मोजणी + Colour Coding)
     function renderDashboardTables() {
       const structures = getAccessibleStructures();
       const search = (document.getElementById("dashSearchInput")?.value || "").toLowerCase();
@@ -1602,26 +1600,24 @@
                           (s.structure_type || "").toLowerCase().includes("cross regulator");
       const isHeadMC = (s) => (s.id || "").trim().toUpperCase() === "MC-01";
 
-      // MC-01 (धरणातून कालव्यामध्ये सोडलेला मुख्य विसर्ग)
       const mc01 = structures.find(s => isHeadMC(s));
       const mc01Discharge = mc01 ? Number(mc01.current_discharge_cfs || 0) : 0;
 
-      // KPIs (CR आणि MC-01 वगळून फक्त वितरिका/शाखा कालव्यांचीच अचूक मोजणी)
       let activeCount = 0;
       let totalDischarge = 0;
       let tailCount = 0;
 
       structures.forEach(s => {
         if (isCR(s) || isHeadMC(s)) return;
-        const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+        const isOn = Number(s.current_discharge_cfs || 0) > 0;
         if (isOn) activeCount++;
         totalDischarge += Number(s.current_discharge_cfs || 0);
         if (s.tail_reached) tailCount++;
       });
 
       const mc01Card = document.getElementById("kpiHeadMcDischarge")?.parentElement;
-      if (mc01Card) mc01Card.style.display = mc01 ? "" : "none";
-      const mc01IsOn = mc01 && ((mc01.current_status || "").toUpperCase() === "ON" || mc01Discharge > 0);
+      if (mc01Card) mc01Card.style.display = "";
+      const mc01IsOn = mc01 && mc01Discharge > 0;
       document.getElementById("kpiHeadMcDischarge").textContent = mc01Discharge.toFixed(2);
       document.getElementById("kpiHeadMcStatus").textContent = mc01
         ? `${mc01IsOn ? "● सुरू (ON)" : "● बंद (OFF)"} • मंजूर: ${mc01.design_discharge_cfs || 2800} Cusecs`
@@ -1632,14 +1628,10 @@
       document.getElementById("kpiTotalDischarge").textContent = totalDischarge.toFixed(2);
       document.getElementById("kpiTailReached").textContent = tailCount;
 
-      // Filter + Sort:
-      // 1) MC-01 (धरणातून सोडलेला विसर्ग) नेहमी सर्वात वर (#1)
-      // 2) त्यानंतर सुरू (ON) असलेले स्ट्रक्चर्स
-      // 3) त्यानंतर बंद (OFF) असलेले स्ट्रक्चर्स
       const filtered = structures
         .filter(s => {
           const matchesSearch = !search || `${s.id} ${s.name}`.toLowerCase().includes(search);
-          const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+          const isOn = Number(s.current_discharge_cfs || 0) > 0;
           if (filter === "on") return matchesSearch && isOn && !isCR(s);
           if (filter === "off") return matchesSearch && !isOn;
           if (filter === "tail") return matchesSearch && Boolean(s.tail_reached) && !isCR(s);
@@ -1648,11 +1640,11 @@
         .sort((a, b) => {
           const aHead = isHeadMC(a) ? 1 : 0;
           const bHead = isHeadMC(b) ? 1 : 0;
-          if (bHead !== aHead) return bHead - aHead; // MC-01 नेहमी सर्वात वर
+          if (bHead !== aHead) return bHead - aHead;
 
-          const aOn = ((a.current_status || "").toUpperCase() === "ON" || Number(a.current_discharge_cfs) > 0) ? 1 : 0;
-          const bOn = ((b.current_status || "").toUpperCase() === "ON" || Number(b.current_discharge_cfs) > 0) ? 1 : 0;
-          if (bOn !== aOn) return bOn - aOn; // सुरू (ON) प्रथम वर
+          const aOn = Number(a.current_discharge_cfs || 0) > 0 ? 1 : 0;
+          const bOn = Number(b.current_discharge_cfs || 0) > 0 ? 1 : 0;
+          if (bOn !== aOn) return bOn - aOn;
 
           return (a.id || "").localeCompare(b.id || "", undefined, { numeric: true });
         });
@@ -1666,7 +1658,7 @@
       } else {
         tbody.innerHTML = filtered.map(s => {
           const isHead = isHeadMC(s);
-          const isOn = (s.current_status || "").toUpperCase() === "ON" || (Number(s.current_discharge_cfs) > 0);
+          const isOn = Number(s.current_discharge_cfs || 0) > 0;
           const meta = metaMap.get(s.id) || {
             rotationHtml: "-",
             startDateText: "-",
@@ -1705,7 +1697,6 @@
         }).join("");
       }
 
-      // Events table (filtered by active Season & Rotation No.)
       const evBody = document.getElementById("eventsTableBody");
       const structMap = new Map(orgData.structures.map(s => [s.id, s.name]));
       const accessibleIds = new Set(structures.map(s => s.id));
@@ -1732,10 +1723,15 @@
       }
     }
 
-    // 6. CANAL OPERATION ENTRY & DIGITAL RECEIPT
     function populateOperationStructures() {
       const sel = document.getElementById("opStructureSelect");
-      const list = getAccessibleStructures();
+      const session = getSession();
+      const role = (session?.role || "").trim().toLowerCase();
+      // विसर्ग नोंदणीसाठी फक्त संबंधित अधिकाऱ्यांचेच Structures दाखवा (MC-01 फक्त Admin/EE1 लाच नोंदणीसाठी दिसेल)
+      const list = getAccessibleStructures().filter(s => {
+        if ((s.id || "").trim().toUpperCase() !== "MC-01") return true;
+        return ["admin", "superadmin", "ee1", "division_officer"].includes(role);
+      });
       sel.innerHTML = `<option value="">— Structure निवडा (${list.length} उपलब्ध) —</option>` +
         list.map(s => `<option value="${s.id}">${s.id} — ${s.name}</option>`).join("");
     }
@@ -1780,7 +1776,6 @@
       btn.textContent = "नोंद Save होत आहे...";
 
       try {
-        // 1. Insert event into canal_operation_events (with manual event_time)
         await sbFetch("/rest/v1/canal_operation_events", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
@@ -1798,7 +1793,6 @@
           })
         });
 
-        // 2. Update structures current status & discharge
         await sbFetch(`/rest/v1/structures?id=eq.${encodeURIComponent(structureId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
@@ -1809,7 +1803,6 @@
           })
         });
 
-        // 3. Sync distributary_operation_state as well so Web and Android App stay 100% in sync
         await sbFetch("/rest/v1/distributary_operation_state?on_conflict=structure_id", {
           method: "POST",
           headers: {
@@ -1824,7 +1817,6 @@
           })
         }).catch(() => {});
 
-        // Generate Digital Receipt
         const structObj = orgData.structures.find(s => s.id === structureId);
         const nowStr = new Date().toLocaleString("en-IN");
         const selectedSeason = document.getElementById("opSeason")?.value || "रब्बी 2026-27";
@@ -1851,17 +1843,19 @@
       }
     }
 
-    // 7. STRUCTURE -> SECTION OFFICER MAPPING
+    // STRUCTURE -> SECTION OFFICER MAPPING (SDO ला सर्व 92 Structures मधून शोधून त्यांच्या Section Officers ना मॅप करता येतील)
     function populateMappingScreen() {
       const structSel = document.getElementById("mapStructureSelect");
       const subSel = document.getElementById("mapSubdivSelect");
       const session = getSession();
+      const liveUserMap = orgData.userMappings.find(u => u.user_id === session?.user_id) || {};
+      const effectiveSubdivId = liveUserMap.subdivision_id || session?.subdivision_id || null;
 
-      structSel.innerHTML = `<option value="">— Structure निवडा —</option>` +
+      structSel.innerHTML = `<option value="">— Structure निवडा (एकूण ${orgData.structures.length}) —</option>` +
         orgData.structures.map(s => `<option value="${s.id}">${s.id} — ${s.name}</option>`).join("");
 
-      const subdivs = (session?.subdivision_id && ["sdo", "subdivision_officer"].includes(session.role))
-        ? orgData.subdivisions.filter(sd => sd.id === session.subdivision_id)
+      const subdivs = (effectiveSubdivId && ["sdo", "subdivision_officer"].includes(session?.role))
+        ? orgData.subdivisions.filter(sd => sd.id === effectiveSubdivId)
         : orgData.subdivisions;
 
       subSel.innerHTML = `<option value="">— Subdivision निवडा —</option>` +
@@ -1953,7 +1947,6 @@
       }
     }
 
-    // 8. BEAT MASTER
     function populateBeatMasterScreen() {
       const brSel = document.getElementById("beatBranchSelect");
       brSel.innerHTML = `<option value="">— Branch निवडा —</option>` +
@@ -1998,8 +1991,6 @@
       }
     }
 
-    // 9. BOOTSTRAP ON PAGE LOAD
-    
     function setDefaultOperationDateTime() {
       const now = new Date();
       now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -2102,11 +2093,10 @@
 
       const result = new Map();
       orgData.structures.forEach(s => {
-        const isOn = (s.current_status || "").toUpperCase() === "ON" || Number(s.current_discharge_cfs || 0) > 0;
+        const isOn = Number(s.current_discharge_cfs || 0) > 0;
         const evList = eventsByStruct.get(s.id) || [];
         const lastEv = evList.length > 0 ? evList[evList.length - 1] : null;
 
-        // संपूर्ण निवडलेल्या हंगाम व आवर्तनातील सर्व टप्प्यांची अचूक बेरीज (बंद-चालू टप्प्यांसह)
         const firstOpenEv = evList.find(e => {
           const t = (e.event_type || "").toUpperCase();
           const st = (e.status_after_event || "").toUpperCase();
@@ -2187,7 +2177,6 @@
           ? `<div class="font-bold text-wrdNavy">${totalMcm.toFixed(4)} MCM</div><div class="text-[11px] text-slate-600">(${totalTmc.toFixed(4)} TMC • ${stepLogs.length} टप्पे)</div>`
           : "-";
 
-        // प्रत्यक्ष System Time (created_at) नुसार सर्वात शेवटी कोणी एन्ट्री केली ते शोधा
         const getEvUser = (e) => e?.recorded_by || e?.updated_by || e?.created_by || e?.user_id || null;
         const allStructEvents = orgData.operationEvents
           .filter(e => e.structure_id === s.id && getEvUser(e))
@@ -2264,8 +2253,8 @@
         const aHead = isHeadMC(a) ? 1 : 0;
         const bHead = isHeadMC(b) ? 1 : 0;
         if (bHead !== aHead) return bHead - aHead;
-        const aOn = ((a.current_status || "").toUpperCase() === "ON" || Number(a.current_discharge_cfs) > 0) ? 1 : 0;
-        const bOn = ((b.current_status || "").toUpperCase() === "ON" || Number(b.current_discharge_cfs) > 0) ? 1 : 0;
+        const aOn = Number(a.current_discharge_cfs || 0) > 0 ? 1 : 0;
+        const bOn = Number(b.current_discharge_cfs || 0) > 0 ? 1 : 0;
         if (bOn !== aOn) return bOn - aOn;
         return (a.id || "").localeCompare(b.id || "", undefined, { numeric: true });
       });
@@ -2285,7 +2274,7 @@
       let mc01Mcm = 0;
 
       list.forEach(st => {
-        const isOn = (st.current_status || "").toUpperCase() === "ON" || Number(st.current_discharge_cfs || 0) > 0;
+        const isOn = Number(st.current_discharge_cfs || 0) > 0;
         const m = metaMap.get(st.id);
         if (isHeadMC(st)) {
           mc01Mcm = m?.totalMcm || 0;
@@ -2305,14 +2294,14 @@
           <div class="bg-white p-2.5 rounded-xl border border-slate-200"><span class="text-slate-500 block">वितरिका एकूण पाणी वापर</span><strong class="text-wrdNavy text-sm">${distMcmTotal.toFixed(4)} MCM</strong></div>
         `;
       }
-      
+
       if (list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="10" class="py-6 text-center text-slate-400">माहिती उपलब्ध नाही.</td></tr>`;
         return;
       }
 
       tbody.innerHTML = list.map((st, idx) => {
-        const isOn = (st.current_status || "").toUpperCase() === "ON" || Number(st.current_discharge_cfs || 0) > 0;
+        const isOn = Number(st.current_discharge_cfs || 0) > 0;
         const meta = metaMap.get(st.id) || { rotationHtml: "-", startDateText: "-", waterUsedHtml: "-", stepLogs: [], updatedByText: "-" };
         const safeRowId = `rep_logs_${idx}`;
         const logsHtml = meta.stepLogs.length > 0
@@ -2343,7 +2332,6 @@
       }).join("");
     }
 
-    // ==================== CHANGE PASSWORD & ADMIN RESET PASSWORD ====================
     function openChangePasswordModal() {
       document.getElementById("newUserPassword").value = "";
       document.getElementById("confirmUserPassword").value = "";
@@ -2417,7 +2405,7 @@
       statusBox.textContent = "Supabase वर पासवर्ड रीसेट होत आहे, कृपया प्रतीक्षा करा...";
 
       try {
-        const res = await sbFetch("/functions/v1/admin-reset-password", {
+        await sbFetch("/functions/v1/admin-reset-password", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
