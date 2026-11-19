@@ -448,7 +448,7 @@
           <div class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4">
             <div>
               <h2 class="text-lg font-bold text-wrdNavy">विसर्ग / कालवा संचालन नोंद (Discharge Entry)</h2>
-              <p class="text-xs text-slate-500 mt-0.5">वितरिका किंवा लघुकालव्याचा चालू विसर्ग व टेल रिच स्थिती नोंदवा.</p>
+              <p class="text-xs text-slate-500 mt-0.5">वितरिका किंवा लघुकालव्याचा चालू विसर्ग, स्वतंत्र Tail Reached व संचालन नोंदवा.</p>
             </div>
 
             <form id="operationForm" onsubmit="submitCanalOperation(event)" class="space-y-4">
@@ -493,6 +493,7 @@
                     class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-wrdAccent">
                     <option value="OPEN">सुरू केले (OPEN / START)</option>
                     <option value="DISCHARGE_CHANGE">विसर्ग बदल (DISCHARGE CHANGE)</option>
+                    <option value="TAIL_REACHED">फक्त Tail Reached नोंद (होय / Yes)</option>
                     <option value="CLOSE">बंद केले (CLOSE / STOP)</option>
                   </select>
                 </div>
@@ -1446,7 +1447,6 @@
           sbFetch("/rest/v1/canal_operation_events?select=*&order=event_time.desc&limit=5000").catch(() => [])
         ]);
 
-        // Supabase मधून ताजे user_mappings मिळाले की localStorage सेशनमध्येही अचूक UUID सेव्ह करा
         if (session && Array.isArray(userMaps) && userMaps.length > 0) {
           const u = userMaps[0];
           saveSession({
@@ -1473,7 +1473,7 @@
             ...s,
             current_status: isLiveOn ? "ON" : "OFF",
             current_discharge_cfs: liveFlow,
-            tail_reached: Boolean(s.tail_reached || op.tail_reached),
+            tail_reached: Boolean(s.tail_reached),
             op_started_at: op.started_at || op.start_time || op.updated_at || null,
             op_rotation_days: op.rotation_period_days ?? op.rotation_days ?? null,
             op_updated_by: op.updated_by || op.started_by || op.recorded_by || null
@@ -1505,14 +1505,12 @@
       }
     }
 
-    // Supabase डेटाबेसमधील प्रत्यक्ष नोंदींच्या (user_mappings UUID + plbc_structure_mapping) आधारे अचूक Structures फिल्टर
     function getAccessibleStructures() {
       const session = getSession();
       if (!session) return [];
       const role = (session.role || "").trim().toLowerCase();
       const isMc01 = (s) => (s.id || "").trim().toUpperCase() === "MC-01";
 
-      // 1. Admin, Superadmin, CE आणि SE यांना संपूर्ण कालव्याचे सर्व Structures दिसतील
       if (["admin", "superadmin", "ce", "se"].includes(role)) {
         return orgData.structures;
       }
@@ -1525,7 +1523,6 @@
       const effectiveBranchId = String(liveUserMap.branch_id || session.branch_id || "").trim().toLowerCase();
       const effectiveBeatId = String(liveUserMap.beat_id || session.beat_id || "").trim().toLowerCase();
 
-      // 2. Division Officer / EE1 / EE2
       if (["division_officer", "ee1", "ee2"].includes(role)) {
         if (!effectiveDivId) return orgData.structures.filter(s => isMc01(s));
         const subToDiv = new Map(orgData.subdivisions.map(sd => [
@@ -1543,7 +1540,6 @@
         });
       }
 
-      // 3. SDO / Subdivision Officer
       if (["sdo", "subdivision_officer"].includes(role)) {
         if (!effectiveSubdivId) return orgData.structures.filter(s => isMc01(s));
         return orgData.structures.filter(s => {
@@ -1554,7 +1550,6 @@
         });
       }
 
-      // 4. Section Officer / Branch Officer
       if (["section_officer", "branch_officer"].includes(role)) {
         if (!effectiveBranchId) return orgData.structures.filter(s => isMc01(s));
         return orgData.structures.filter(s => {
@@ -1565,7 +1560,6 @@
         });
       }
 
-      // 5. Beat Head / Staff
       if (["beat_head", "staff"].includes(role)) {
         if (!effectiveBeatId) return orgData.structures.filter(s => isMc01(s));
         return orgData.structures.filter(s => {
@@ -1742,7 +1736,6 @@
       const sel = document.getElementById("opStructureSelect");
       const session = getSession();
       const role = (session?.role || "").trim().toLowerCase();
-      // विसर्ग नोंदणीसाठी फक्त संबंधित अधिकाऱ्यांचेच Structures दाखवा (MC-01 फक्त Admin/EE1 लाच नोंदणीसाठी दिसेल)
       const list = getAccessibleStructures().filter(s => {
         if ((s.id || "").trim().toUpperCase() !== "MC-01") return true;
         return ["admin", "superadmin", "ee1", "division_officer"].includes(role);
@@ -1766,9 +1759,17 @@
 
     function onOpEventTypeChange() {
       const evType = document.getElementById("opEventType").value;
+      const structId = document.getElementById("opStructureSelect").value;
+      const s = orgData.structures.find(x => x.id === structId);
+
       if (evType === "CLOSE") {
         document.getElementById("opDischarge").value = "0";
         document.getElementById("opTailReached").value = "false";
+      } else if (evType === "TAIL_REACHED") {
+        if (s && Number(s.current_discharge_cfs || 0) > 0) {
+          document.getElementById("opDischarge").value = Number(s.current_discharge_cfs).toFixed(2);
+        }
+        document.getElementById("opTailReached").value = "true";
       }
     }
 
@@ -1776,14 +1777,39 @@
       e.preventDefault();
       const session = getSession();
       const structureId = document.getElementById("opStructureSelect").value;
-      const eventType = document.getElementById("opEventType").value;
-      const discharge = parseFloat(document.getElementById("opDischarge").value || "0");
-      const tailReached = document.getElementById("opTailReached").value === "true";
-      const rotationDays = document.getElementById("opRotationDays").value ? parseInt(document.getElementById("opRotationDays").value, 10) : null;
-      const remarks = document.getElementById("opRemarks").value.trim();
+      const rawEventType = document.getElementById("opEventType").value;
+      const isTailOnly = rawEventType === "TAIL_REACHED";
+
+      const structObj = orgData.structures.find(s => s.id === structureId);
+      const currentLiveFlow = Number(structObj?.current_discharge_cfs || 0);
+      const alreadyRunning = Boolean(structObj && ((structObj.current_status || "").toUpperCase() === "ON" || currentLiveFlow > 0));
+
+      const rawFlowInput = document.getElementById("opDischarge").value;
+      const parsedFlow = rawFlowInput === "" && isTailOnly ? currentLiveFlow : parseFloat(rawFlowInput || "0");
+      const discharge = isNaN(parsedFlow) ? 0 : parsedFlow;
+
+      // स्ट्रक्चर आधीपासून सुरू असेल तर 'OPEN' ऐवजी 'DISCHARGE_CHANGE' वापरा (अतिरिक्त OPEN लॉग टाळण्यासाठी)
+      const normalizedEventType = isTailOnly
+        ? (alreadyRunning ? "DISCHARGE_CHANGE" : "OPEN")
+        : ((rawEventType === "OPEN" && alreadyRunning) ? "DISCHARGE_CHANGE" : rawEventType);
+
+      const desiredRunning = isTailOnly
+        ? (discharge > 0 || alreadyRunning)
+        : (normalizedEventType !== "CLOSE" && discharge > 0);
+
+      const effectiveDischarge = desiredRunning ? discharge : 0;
+      const tailReached = isTailOnly
+        ? true
+        : (!desiredRunning ? false : (document.getElementById("opTailReached").value === "true"));
+
+      const rotationDays = document.getElementById("opRotationDays").value
+        ? parseInt(document.getElementById("opRotationDays").value, 10)
+        : null;
+      const rawRemarks = document.getElementById("opRemarks").value.trim();
+      const remarks = rawRemarks || (isTailOnly ? "Tail Reached नोंद (होय / Yes)" : null);
       const manualDt = document.getElementById("opEventDateTime")?.value;
       const eventTimeIso = manualDt ? new Date(manualDt).toISOString() : new Date().toISOString();
-      const statusAfter = (eventType === "CLOSE" || discharge <= 0) ? "OFF" : "ON";
+      const statusAfter = desiredRunning ? "ON" : "OFF";
       const btn = document.getElementById("btnSaveOperation");
 
       if (!structureId) return;
@@ -1791,29 +1817,31 @@
       btn.textContent = "नोंद Save होत आहे...";
 
       try {
-        await sbFetch("/rest/v1/canal_operation_events", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
-          body: JSON.stringify({
-            structure_id: structureId,
-            season: document.getElementById("opSeason")?.value || "रब्बी 2026-27",
-            rotation_no: parseInt(document.getElementById("opRotationNo")?.value || "1", 10),
-            event_type: eventType,
-            status_after_event: statusAfter,
-            discharge_cfs: discharge,
-            rotation_period_days: rotationDays,
-            event_time: eventTimeIso,
-            remarks: remarks || null,
-            recorded_by: session.user_id
-          })
-        });
+        if (!(isTailOnly && alreadyRunning)) {
+          await sbFetch("/rest/v1/canal_operation_events", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
+            body: JSON.stringify({
+              structure_id: structureId,
+              season: document.getElementById("opSeason")?.value || "रब्बी 2026-27",
+              rotation_no: parseInt(document.getElementById("opRotationNo")?.value || "1", 10),
+              event_type: normalizedEventType,
+              status_after_event: statusAfter,
+              discharge_cfs: effectiveDischarge,
+              rotation_period_days: rotationDays,
+              event_time: eventTimeIso,
+              remarks: remarks,
+              recorded_by: session.user_id
+            })
+          });
+        }
 
         await sbFetch(`/rest/v1/structures?id=eq.${encodeURIComponent(structureId)}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", "Prefer": "return=minimal" },
           body: JSON.stringify({
             current_status: statusAfter,
-            current_discharge_cfs: discharge,
+            current_discharge_cfs: effectiveDischarge,
             tail_reached: tailReached
           })
         });
@@ -1826,13 +1854,11 @@
           },
           body: JSON.stringify({
             structure_id: structureId,
-            status: statusAfter === "ON" ? "running" : "closed",
-            current_discharge_cfs: discharge,
-            tail_reached: tailReached
+            status: desiredRunning ? "running" : "closed",
+            current_discharge_cfs: effectiveDischarge
           })
         }).catch(() => {});
 
-        const structObj = orgData.structures.find(s => s.id === structureId);
         const nowStr = new Date().toLocaleString("en-IN");
         const selectedSeason = document.getElementById("opSeason")?.value || "रब्बी 2026-27";
         const selectedRotNo = document.getElementById("opRotationNo")?.value || "1";
@@ -1840,10 +1866,10 @@
           <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">हंगाम व आवर्तन:</span><span class="font-bold text-wrdBlue">${selectedSeason} • आवर्तन क्र. ${selectedRotNo}</span></div>
           <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">दिनांक व वेळ:</span><span class="font-bold">${nowStr}</span></div>
           <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">Structure:</span><span class="font-bold text-wrdNavy">${structureId} — ${structObj?.name || ""}</span></div>
-          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">संचालन प्रकार:</span><span class="font-bold">${eventType} (${statusAfter})</span></div>
-          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">नोंदवलेला विसर्ग:</span><span class="font-bold text-wrdAccent text-base">${discharge.toFixed(2)} Cusecs</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">संचालन प्रकार:</span><span class="font-bold">${isTailOnly ? "TAIL_REACHED" : normalizedEventType} (${statusAfter})</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">नोंदवलेला विसर्ग:</span><span class="font-bold text-wrdAccent text-base">${effectiveDischarge.toFixed(2)} Cusecs</span></div>
           <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">Tail Reached:</span><span class="font-bold">${tailReached ? "होय (YES)" : "नाही (NO)"}</span></div>
-          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">शेरा:</span><span class="font-medium">${remarks || "-"}</span></div>
+          <div class="flex justify-between py-1 border-b border-slate-100"><span class="text-slate-500">शेरा:</span><span class="font-medium">${rawRemarks || "-"}</span></div>
           <div class="flex justify-between py-1"><span class="text-slate-500">नोंद करणारे अधिकारी:</span><span class="font-bold">${session.full_name}</span></div>
         `;
         document.getElementById("receiptActions").classList.remove("hidden");
@@ -1858,7 +1884,6 @@
       }
     }
 
-    // STRUCTURE -> SECTION OFFICER MAPPING (SDO ला सर्व 92 Structures मधून शोधून त्यांच्या Section Officers ना मॅप करता येतील)
     function populateMappingScreen() {
       const structSel = document.getElementById("mapStructureSelect");
       const subSel = document.getElementById("mapSubdivSelect");
